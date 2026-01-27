@@ -1,0 +1,166 @@
+# =============================================================================
+# SUBSISTEMA DE EVENTOS - Microservicio
+# =============================================================================
+# Gestiona eventos (casuales y oficiales) y moderación
+# Endpoints:
+#   POST   /api/eventos                    - Crear evento
+#   GET    /api/eventos                    - Listar eventos
+#   GET    /api/eventos/{id}               - Detalle de evento
+#   PUT    /api/eventos/{id}               - Actualizar evento
+#   DELETE /api/eventos/{id}               - Cancelar evento
+#   POST   /api/eventos/{id}/aprobar       - Aprobar evento (moderación)
+#   POST   /api/eventos/{id}/rechazar      - Rechazar evento (moderación)
+# Tipo de servicio: ClusterIP (solo accesible desde el API Gateway)
+# =============================================================================
+
+---
+# ConfigMap con configuración del servicio
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eventos-service-config
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: eventos-service
+data:
+  # Configuración de conexión a BD
+  DB_HOST: "db-eventos"
+  DB_PORT: "5432"
+  DB_NAME: "eventos_db"
+  # Configuración del servicio
+  SERVICE_PORT: "8080"
+  LOG_LEVEL: "INFO"
+  # Configuración de moderación
+  AUTO_APPROVE_CASUAL: "false"
+  REQUIRE_APPROVAL_OFICIAL: "true"
+
+---
+# ConfigMap para nginx mock (prototipo)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eventos-nginx-config
+  namespace: eventos-system
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        server {
+            listen 8080;
+
+            # Health check endpoint
+            location /health {
+                return 200 '{"status": "healthy", "service": "eventos-service"}';
+                add_header Content-Type application/json;
+            }
+
+            # API endpoints mock - Gestión de eventos
+            location /api/eventos {
+                return 200 '{"message": "Eventos Service - Endpoint activo", "endpoints": ["POST /api/eventos", "GET /api/eventos", "GET /api/eventos/{id}", "PUT /api/eventos/{id}", "DELETE /api/eventos/{id}", "POST /api/eventos/{id}/aprobar", "POST /api/eventos/{id}/rechazar", "GET /api/eventos/pendientes", "GET /api/eventos/feed"]}';
+                add_header Content-Type application/json;
+                add_header X-Service-Name "eventos-service";
+            }
+
+            # Catch-all
+            location / {
+                return 200 '{"service": "eventos-service", "status": "running", "version": "1.0.0-prototype"}';
+                add_header Content-Type application/json;
+            }
+        }
+    }
+
+---
+# Deployment del servicio
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eventos-service
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: eventos-service
+    app.kubernetes.io/part-of: eventos-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: eventos-service
+  template:
+    metadata:
+      labels:
+        app: eventos-service
+        app.kubernetes.io/component: application
+        app.kubernetes.io/name: eventos-service
+    spec:
+      containers:
+        - name: eventos-service
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: eventos-service-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-eventos-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-eventos-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: eventos-nginx-config
+
+---
+# Service ClusterIP
+apiVersion: v1
+kind: Service
+metadata:
+  name: eventos-service
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: eventos-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: eventos-service

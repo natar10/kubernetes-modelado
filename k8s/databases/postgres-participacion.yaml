@@ -1,0 +1,118 @@
+# =============================================================================
+# BASE DE DATOS - Subsistema de Participación
+# =============================================================================
+# PostgreSQL dedicado para el subsistema de participación
+# - Almacena inscripciones a eventos
+# - Control de capacidad
+# Tipo de servicio: ClusterIP (solo accesible internamente)
+# =============================================================================
+
+---
+# PersistentVolumeClaim para persistencia de datos
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-participacion-pvc
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: db-participacion
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# Deployment de PostgreSQL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-participacion
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: db-participacion
+    app.kubernetes.io/part-of: eventos-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-participacion
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: db-participacion
+        app.kubernetes.io/component: database
+        app.kubernetes.io/name: db-participacion
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          envFrom:
+            - secretRef:
+                name: db-participacion-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - participacion_user
+                - -d
+                - participacion_db
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - participacion_user
+                - -d
+                - participacion_db
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: db-participacion-pvc
+
+---
+# Service ClusterIP para acceso interno
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-participacion
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: db-participacion
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  selector:
+    app: db-participacion

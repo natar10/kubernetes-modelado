@@ -1,0 +1,169 @@
+# =============================================================================
+# SUBSISTEMA DE PARTICIPACIÓN - Microservicio
+# =============================================================================
+# Gestiona inscripciones a eventos y control de capacidad
+# Endpoints:
+#   POST   /api/eventos/{id}/unirse        - Unirse a evento
+#   DELETE /api/eventos/{id}/abandonar     - Abandonar evento
+#   GET    /api/eventos/{id}/participantes - Lista de participantes
+#   GET    /api/participacion/mis-eventos  - Mis inscripciones
+# Tipo de servicio: ClusterIP (solo accesible desde el API Gateway)
+# Comunicación interna: Consulta al subsistema de eventos para validar
+# =============================================================================
+
+---
+# ConfigMap con configuración del servicio
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: participacion-service-config
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: participacion-service
+data:
+  # Configuración de conexión a BD
+  DB_HOST: "db-participacion"
+  DB_PORT: "5432"
+  DB_NAME: "participacion_db"
+  # URL del servicio de eventos para comunicación interna
+  EVENTOS_SERVICE_URL: "http://eventos-service:8080"
+  # Configuración del servicio
+  SERVICE_PORT: "8080"
+  LOG_LEVEL: "INFO"
+
+---
+# ConfigMap para nginx mock (prototipo)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: participacion-nginx-config
+  namespace: eventos-system
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        server {
+            listen 8080;
+
+            # Health check endpoint
+            location /health {
+                return 200 '{"status": "healthy", "service": "participacion-service"}';
+                add_header Content-Type application/json;
+            }
+
+            # API endpoints mock - Participación
+            location /api/eventos {
+                return 200 '{"message": "Participacion Service - Endpoint activo", "endpoints": ["POST /api/eventos/{id}/unirse", "DELETE /api/eventos/{id}/abandonar", "GET /api/eventos/{id}/participantes"]}';
+                add_header Content-Type application/json;
+                add_header X-Service-Name "participacion-service";
+            }
+
+            location /api/participacion {
+                return 200 '{"message": "Participacion Service - Endpoint activo", "endpoints": ["GET /api/participacion/mis-eventos"]}';
+                add_header Content-Type application/json;
+                add_header X-Service-Name "participacion-service";
+            }
+
+            # Catch-all
+            location / {
+                return 200 '{"service": "participacion-service", "status": "running", "version": "1.0.0-prototype"}';
+                add_header Content-Type application/json;
+            }
+        }
+    }
+
+---
+# Deployment del servicio
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: participacion-service
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: participacion-service
+    app.kubernetes.io/part-of: eventos-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: participacion-service
+  template:
+    metadata:
+      labels:
+        app: participacion-service
+        app.kubernetes.io/component: application
+        app.kubernetes.io/name: participacion-service
+    spec:
+      containers:
+        - name: participacion-service
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: participacion-service-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-participacion-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-participacion-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: participacion-nginx-config
+
+---
+# Service ClusterIP
+apiVersion: v1
+kind: Service
+metadata:
+  name: participacion-service
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: participacion-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: participacion-service

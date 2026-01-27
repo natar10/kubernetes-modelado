@@ -1,0 +1,46 @@
+# =============================================================================
+# KUSTOMIZATION - Gestión centralizada de manifiestos
+# =============================================================================
+# Permite desplegar todos los recursos con un solo comando:
+#   kubectl apply -k .
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: eventos-system
+
+# Recursos a desplegar (en orden)
+resources:
+  # 1. Namespace
+  - namespace.yaml
+
+  # 2. Configuración (Secrets y ConfigMaps)
+  - configmaps/secrets.yaml
+  - configmaps/api-gateway-config.yaml
+
+  # 3. Bases de datos
+  - databases/postgres-keycloak.yaml
+  - databases/postgres-usuarios.yaml
+  - databases/postgres-eventos.yaml
+  - databases/postgres-participacion.yaml
+
+  # 4. Servicios de aplicación
+  - services/keycloak.yaml
+  - services/usuarios-service.yaml
+  - services/eventos-service.yaml
+  - services/participacion-service.yaml
+
+  # 5. Ingress
+  - ingress/ingress.yaml
+
+# Labels comunes aplicados a todos los recursos
+commonLabels:
+  app.kubernetes.io/part-of: eventos-platform
+  app.kubernetes.io/managed-by: kustomize
+  environment: development
+
+# Anotaciones comunes
+commonAnnotations:
+  description: "Plataforma de Gestion de Eventos - Prototipo Academico"
+  maintainer: "UVA Sistemas Distribuidos"

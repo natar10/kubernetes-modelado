@@ -1,0 +1,17 @@
+# =============================================================================
+# NAMESPACE - Aislamiento lógico del sistema de eventos
+# =============================================================================
+# Todos los recursos del sistema se despliegan en este namespace para:
+# - Aislamiento de otros workloads del cluster
+# - Gestión de recursos (quotas, limits)
+# - Control de acceso (RBAC)
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eventos-system
+  labels:
+    app.kubernetes.io/name: eventos-system
+    app.kubernetes.io/part-of: eventos-platform
+    environment: development

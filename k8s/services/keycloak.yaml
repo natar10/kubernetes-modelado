@@ -1,0 +1,152 @@
+# =============================================================================
+# KEYCLOAK - Identity & Access Management
+# =============================================================================
+# Servidor de identidad OAuth2/OIDC
+# - Autenticación de usuarios
+# - Emisión y validación de JWT tokens
+# - Gestión de roles y permisos
+# - Consola de administración
+# Tipo de servicio: ClusterIP (expuesto vía Ingress)
+# =============================================================================
+
+---
+# ConfigMap para configuración de Keycloak
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-config
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: identity
+    app.kubernetes.io/name: keycloak
+data:
+  # Modo de ejecución (dev para prototipo, production para producción)
+  KC_HOSTNAME_STRICT: "false"
+  KC_HOSTNAME_STRICT_HTTPS: "false"
+  KC_HTTP_ENABLED: "true"
+  KC_PROXY: "edge"
+  # Base de datos
+  KC_DB: "postgres"
+  KC_DB_URL_HOST: "db-keycloak"
+  KC_DB_URL_PORT: "5432"
+  KC_DB_URL_DATABASE: "keycloak_db"
+  # Health checks
+  KC_HEALTH_ENABLED: "true"
+  KC_METRICS_ENABLED: "true"
+
+---
+# Deployment de Keycloak
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: identity
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: eventos-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        app.kubernetes.io/component: identity
+        app.kubernetes.io/name: keycloak
+    spec:
+      # Esperar a que la base de datos esté lista
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Esperando a que PostgreSQL esté disponible..."
+              until nc -z db-keycloak 5432; do
+                echo "PostgreSQL no disponible, reintentando en 2s..."
+                sleep 2
+              done
+              echo "PostgreSQL disponible!"
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:23.0
+          args:
+            - start-dev  # Para prototipo/desarrollo
+            # En producción usar: start --optimized
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8443
+              name: https
+          envFrom:
+            - configMapRef:
+                name: keycloak-config
+            - secretRef:
+                name: keycloak-secret
+          env:
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-keycloak-secret
+                  key: POSTGRES_USER
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-keycloak-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+
+---
+# Service ClusterIP para Keycloak
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: identity
+    app.kubernetes.io/name: keycloak
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: keycloak

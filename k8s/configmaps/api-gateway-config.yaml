@@ -1,0 +1,178 @@
+# =============================================================================
+# API GATEWAY - Configuración Central
+# =============================================================================
+# ConfigMap con configuración compartida para el API Gateway
+# Incluye URLs de servicios y configuración de autenticación
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: configuration
+    app.kubernetes.io/name: api-gateway-config
+data:
+  # URLs de servicios internos
+  USUARIOS_SERVICE_URL: "http://usuarios-service:8080"
+  EVENTOS_SERVICE_URL: "http://eventos-service:8080"
+  PARTICIPACION_SERVICE_URL: "http://participacion-service:8080"
+  KEYCLOAK_URL: "http://keycloak:8080"
+
+  # Configuración de autenticación JWT
+  JWT_ISSUER: "http://keycloak:8080/realms/eventos"
+  JWT_AUDIENCE: "eventos-api"
+
+  # Headers que se propagan a los servicios backend
+  PROPAGATE_HEADERS: "X-User-ID,X-User-Roles,X-Request-ID"
+
+  # Configuración del sistema
+  ENVIRONMENT: "development"
+  LOG_LEVEL: "INFO"
+
+---
+# NetworkPolicy para restringir acceso entre servicios
+# Solo permite tráfico necesario según la arquitectura
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: eventos-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Permitir tráfico desde Ingress a todos los servicios
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-services
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: application
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+
+---
+# Permitir que servicios accedan a sus bases de datos
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-to-databases
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: database
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: application
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# Permitir que servicios accedan a Keycloak
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-to-keycloak
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: application
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Permitir que Keycloak acceda a su base de datos
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-keycloak-to-database
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app: db-keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# Permitir comunicación entre Participación y Eventos
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-participacion-to-eventos
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app: eventos-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: participacion-service
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# Permitir DNS resolution
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: eventos-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

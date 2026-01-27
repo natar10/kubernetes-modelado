@@ -1,0 +1,166 @@
+# =============================================================================
+# SUBSISTEMA DE USUARIOS - Microservicio
+# =============================================================================
+# Gestiona perfiles de usuario y sincronización con Keycloak
+# Endpoints:
+#   GET    /api/users/{id}          - Obtener perfil
+#   PUT    /api/users/{id}          - Actualizar perfil
+#   GET    /api/users/{id}/eventos  - Eventos del usuario
+#   POST   /api/users/sync          - Sincronizar con Keycloak
+# Tipo de servicio: ClusterIP (solo accesible desde el API Gateway)
+# =============================================================================
+
+---
+# ConfigMap con configuración del servicio
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: usuarios-service-config
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: usuarios-service
+data:
+  # Configuración de conexión a BD
+  DB_HOST: "db-usuarios"
+  DB_PORT: "5432"
+  DB_NAME: "usuarios_db"
+  # Configuración de Keycloak para sincronización
+  KEYCLOAK_URL: "http://keycloak:8080"
+  KEYCLOAK_REALM: "eventos"
+  # Configuración del servicio
+  SERVICE_PORT: "8080"
+  LOG_LEVEL: "INFO"
+
+---
+# ConfigMap para nginx mock (prototipo)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: usuarios-nginx-config
+  namespace: eventos-system
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        server {
+            listen 8080;
+
+            # Health check endpoint
+            location /health {
+                return 200 '{"status": "healthy", "service": "usuarios-service"}';
+                add_header Content-Type application/json;
+            }
+
+            # API endpoints mock
+            location /api/users {
+                # Mock response para demostración
+                return 200 '{"message": "Usuarios Service - Endpoint activo", "endpoints": ["/api/users/{id}", "/api/users/{id}/eventos", "/api/users/sync"]}';
+                add_header Content-Type application/json;
+                add_header X-Service-Name "usuarios-service";
+            }
+
+            # Catch-all para el servicio
+            location / {
+                return 200 '{"service": "usuarios-service", "status": "running", "version": "1.0.0-prototype"}';
+                add_header Content-Type application/json;
+            }
+        }
+    }
+
+---
+# Deployment del servicio
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: usuarios-service
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: usuarios-service
+    app.kubernetes.io/part-of: eventos-platform
+spec:
+  replicas: 2  # Alta disponibilidad básica
+  selector:
+    matchLabels:
+      app: usuarios-service
+  template:
+    metadata:
+      labels:
+        app: usuarios-service
+        app.kubernetes.io/component: application
+        app.kubernetes.io/name: usuarios-service
+    spec:
+      containers:
+        - name: usuarios-service
+          # Para prototipo usamos nginx como mock server
+          # En producción: reemplazar con imagen del microservicio real
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: usuarios-service-config
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-usuarios-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-usuarios-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: usuarios-nginx-config
+
+---
+# Service ClusterIP
+apiVersion: v1
+kind: Service
+metadata:
+  name: usuarios-service
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: application
+    app.kubernetes.io/name: usuarios-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: usuarios-service
