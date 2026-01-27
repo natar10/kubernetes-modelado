@@ -34,6 +34,9 @@ k8s_yaml('services/usuarios-service.yaml')
 k8s_yaml('services/eventos-service.yaml')
 k8s_yaml('services/participacion-service.yaml')
 
+# API Gateway
+k8s_yaml('services/api-gateway.yaml')
+
 # Ingress
 k8s_yaml('ingress/ingress.yaml')
 
@@ -51,14 +54,17 @@ k8s_resource('db-participacion', labels=['databases'], resource_deps=[])
 k8s_resource('keycloak',
     labels=['identity'],
     resource_deps=['db-keycloak'],
-    port_forwards=['8080:8080']
+    port_forwards=['8080:8080'],
+    links=[
+        'http://keycloak.eventos.local'
+    ]
 )
 
 # Microservicios (esperan a sus BDs)
 k8s_resource('usuarios-service',
     labels=['services'],
     resource_deps=['db-usuarios', 'keycloak'],
-    port_forwards=['8081:8080']
+    port_forwards=['8081:8080'],
 )
 
 k8s_resource('eventos-service',
@@ -73,6 +79,16 @@ k8s_resource('participacion-service',
     port_forwards=['8083:8080']
 )
 
+# API Gateway (punto de entrada centralizado)
+k8s_resource('api-gateway',
+    labels=['gateway'],
+    resource_deps=['usuarios-service', 'eventos-service', 'participacion-service', 'keycloak'],
+    port_forwards=['9000:8080'],
+    links=[
+        'http://api.eventos.local'
+    ]
+)
+
 # -----------------------------------------------------------------------------
 # 3. INFORMACIÓN EN CONSOLA
 # -----------------------------------------------------------------------------
@@ -84,11 +100,19 @@ print("""
 
   Dashboard Tilt:     http://localhost:10350
 
-  Servicios (via port-forward):
+  Via Ingress (requiere /etc/hosts):
+    - API Gateway:    http://api.eventos.local
+    - Keycloak:       http://keycloak.eventos.local
+
+  Via port-forward (acceso directo):
+    - API Gateway:    http://localhost:9000
     - Keycloak:       http://localhost:8080
     - Usuarios:       http://localhost:8081
     - Eventos:        http://localhost:8082
-    - Participación:  http://localhost:8083
+    - Participacion:  http://localhost:8083
+
+  Arquitectura:
+    Cliente -> Ingress -> API Gateway -> Microservicios
 
   Credenciales Keycloak:
     - Usuario: admin

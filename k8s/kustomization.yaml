@@ -31,7 +31,10 @@ resources:
   - services/eventos-service.yaml
   - services/participacion-service.yaml
 
-  # 5. Ingress
+  # 5. API Gateway
+  - services/api-gateway.yaml
+
+  # 6. Ingress
   - ingress/ingress.yaml
 
 # Labels comunes aplicados a todos los recursos

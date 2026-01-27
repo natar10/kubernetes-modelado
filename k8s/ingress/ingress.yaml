@@ -1,122 +1,48 @@
 # =============================================================================
-# INGRESS - API Gateway Layer
+# INGRESS - Entrada al Cluster
 # =============================================================================
-# Punto de entrada público al sistema
-# - Enrutamiento basado en paths a los diferentes servicios
-# - Validación JWT vía annotations (con nginx-ingress-controller)
-# - Load balancing automático
+# Punto de entrada público que redirige todo al API Gateway dedicado
+#
+# Flujo: Cliente → Ingress → API Gateway → Microservicios
 #
 # REQUISITO: Instalar nginx-ingress-controller en el cluster
 #   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.4/deploy/static/provider/cloud/deploy.yaml
 # =============================================================================
 
 ---
-# Ingress principal del API Gateway
+# Ingress principal - Todo va al API Gateway
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: api-gateway
+  name: main-ingress
   namespace: eventos-system
   labels:
     app.kubernetes.io/component: ingress
-    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/name: main-ingress
     app.kubernetes.io/part-of: eventos-platform
   annotations:
-    # Configuración de nginx-ingress
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
-    # CORS (para desarrollo)
-    nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
-    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Requested-With"
-    # Rate limiting básico
-    nginx.ingress.kubernetes.io/limit-rps: "100"
-    # SSL redirect (desactivado para desarrollo)
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    # Reescritura de paths cuando sea necesario
-    # nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
-    # Regla principal para el dominio de la API
-    - host: api.eventos.local  # Cambiar en producción
+    # API Gateway - Punto de entrada principal
+    - host: api.eventos.local
       http:
         paths:
-          # ============================================
-          # RUTAS DE AUTENTICACIÓN -> Keycloak
-          # ============================================
-          - path: /auth
+          - path: /
             pathType: Prefix
             backend:
               service:
-                name: keycloak
-                port:
-                  number: 8080
-
-          # ============================================
-          # RUTAS DE USUARIOS -> Usuarios Service
-          # ============================================
-          - path: /api/users
-            pathType: Prefix
-            backend:
-              service:
-                name: usuarios-service
-                port:
-                  number: 8080
-
-          # ============================================
-          # RUTAS DE PARTICIPACIÓN -> Participación Service
-          # Nota: Más específicas primero
-          # ============================================
-          - path: /api/participacion
-            pathType: Prefix
-            backend:
-              service:
-                name: participacion-service
-                port:
-                  number: 8080
-
-          # Rutas de unirse/abandonar eventos
-          - path: /api/eventos/(.+)/unirse
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: participacion-service
-                port:
-                  number: 8080
-
-          - path: /api/eventos/(.+)/abandonar
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: participacion-service
-                port:
-                  number: 8080
-
-          - path: /api/eventos/(.+)/participantes
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: participacion-service
-                port:
-                  number: 8080
-
-          # ============================================
-          # RUTAS DE EVENTOS -> Eventos Service
-          # (Catch-all para /api/eventos)
-          # ============================================
-          - path: /api/eventos
-            pathType: Prefix
-            backend:
-              service:
-                name: eventos-service
+                name: api-gateway
                 port:
                   number: 8080
 
 ---
-# Ingress separado para Keycloak Admin Console (opcional)
+# Ingress separado para Keycloak Admin Console (acceso directo)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -131,7 +57,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: keycloak.eventos.local  # Acceso a consola admin
+    - host: keycloak.eventos.local
       http:
         paths:
           - path: /
