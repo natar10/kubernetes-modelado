@@ -37,11 +37,25 @@ k8s_yaml('services/participacion-service.yaml')
 # API Gateway
 k8s_yaml('services/api-gateway.yaml')
 
+# Cliente React
+k8s_yaml('services/client.yaml')
+
 # Ingress
 k8s_yaml('ingress/ingress.yaml')
 
 # -----------------------------------------------------------------------------
-# 2. AGRUPAR RECURSOS PARA EL DASHBOARD
+# 2. BUILD DE IMAGENES
+# -----------------------------------------------------------------------------
+
+# Construir imagen del cliente React
+docker_build(
+    'eventos-client',
+    '../client',
+    dockerfile='../client/Dockerfile'
+)
+
+# -----------------------------------------------------------------------------
+# 3. AGRUPAR RECURSOS PARA EL DASHBOARD
 # -----------------------------------------------------------------------------
 
 # Bases de datos
@@ -89,8 +103,18 @@ k8s_resource('api-gateway',
     ]
 )
 
+# Cliente React
+k8s_resource('client',
+    labels=['frontend'],
+    resource_deps=['api-gateway'],
+    port_forwards=['3000:80'],
+    links=[
+        'http://eventos.local'
+    ]
+)
+
 # -----------------------------------------------------------------------------
-# 3. INFORMACIÓN EN CONSOLA
+# 4. INFORMACIÓN EN CONSOLA
 # -----------------------------------------------------------------------------
 
 print("""
@@ -101,22 +125,24 @@ print("""
   Dashboard Tilt:     http://localhost:10350
 
   Via Ingress (requiere /etc/hosts):
+    - Cliente:        http://eventos.local
     - API Gateway:    http://api.eventos.local
     - Keycloak:       http://keycloak.eventos.local
 
   Via port-forward (acceso directo):
+    - Cliente:        http://localhost:3000
     - API Gateway:    http://localhost:9000
     - Keycloak:       http://localhost:8080
-    - Usuarios:       http://localhost:8081
-    - Eventos:        http://localhost:8082
-    - Participacion:  http://localhost:8083
 
   Arquitectura:
-    Cliente -> Ingress -> API Gateway -> Microservicios
+    Cliente (React) -> Ingress -> API Gateway -> Microservicios
 
   Credenciales Keycloak:
     - Usuario: admin
     - Password: admin_password_dev
+
+  /etc/hosts:
+    127.0.0.1 eventos.local api.eventos.local keycloak.eventos.local
 
 ============================================================
 """)

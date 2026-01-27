@@ -34,7 +34,10 @@ resources:
   # 5. API Gateway
   - services/api-gateway.yaml
 
-  # 6. Ingress
+  # 6. Cliente
+  - services/client.yaml
+
+  # 7. Ingress
   - ingress/ingress.yaml
 
 # Labels comunes aplicados a todos los recursos

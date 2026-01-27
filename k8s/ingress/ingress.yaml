@@ -42,6 +42,32 @@ spec:
                   number: 8080
 
 ---
+# Ingress para el Cliente React
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: client-ingress
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/name: client-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: eventos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: client
+                port:
+                  number: 80
+
+---
 # Ingress separado para Keycloak Admin Console (acceso directo)
 apiVersion: networking.k8s.io/v1
 kind: Ingress

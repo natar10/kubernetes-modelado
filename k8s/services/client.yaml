@@ -1,0 +1,81 @@
+# =============================================================================
+# CLIENTE - Aplicación React
+# =============================================================================
+# Frontend del sistema que se conecta al API Gateway
+# - Muestra estado de los servicios
+# - Permite probar endpoints
+# Tipo de servicio: ClusterIP (expuesto vía Ingress)
+# =============================================================================
+
+---
+# Deployment del Cliente
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/name: client
+    app.kubernetes.io/part-of: eventos-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client
+  template:
+    metadata:
+      labels:
+        app: client
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/name: client
+    spec:
+      containers:
+        - name: client
+          image: eventos-client:latest
+          imagePullPolicy: Never  # Usar imagen local de Docker Desktop
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: API_URL
+              value: "http://api.eventos.local"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+
+---
+# Service ClusterIP
+apiVersion: v1
+kind: Service
+metadata:
+  name: client
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/name: client
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: client
