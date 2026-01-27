@@ -56,102 +56,126 @@ data:
             # HEALTH CHECKS
             # ===========================================
             location /health {
-                return 200 '{"status": "healthy", "service": "api-gateway"}';
                 add_header Content-Type application/json;
+                return 200 '{"status": "healthy", "service": "api-gateway"}';
             }
 
             location /ready {
-                return 200 '{"status": "ready", "service": "api-gateway"}';
                 add_header Content-Type application/json;
+                return 200 '{"status": "ready", "service": "api-gateway"}';
             }
 
             # ===========================================
             # INFO ENDPOINT
             # ===========================================
             location = / {
-                return 200 '{
-                    "service": "api-gateway",
-                    "version": "1.0.0-prototype",
-                    "description": "Punto de entrada centralizado",
-                    "routes": {
-                        "/auth/*": "keycloak",
-                        "/api/users/*": "usuarios-service",
-                        "/api/eventos/*": "eventos-service (o participacion-service)",
-                        "/api/participacion/*": "participacion-service"
-                    },
-                    "note": "En produccion: validaria JWT y añadiria headers X-User-ID, X-User-Roles"
-                }';
+                add_header 'Access-Control-Allow-Origin' '*' always;
                 add_header Content-Type application/json;
+                return 200 '{"service": "api-gateway", "version": "1.0.0-prototype", "routes": ["/api/users", "/api/eventos", "/api/participacion", "/auth"]}';
+            }
+
+            # ===========================================
+            # CORS Preflight (OPTIONS)
+            # ===========================================
+            location @cors_preflight {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+                add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type, X-Requested-With';
+                add_header 'Access-Control-Max-Age' 86400;
+                add_header 'Content-Length' 0;
+                add_header 'Content-Type' 'text/plain';
+                return 204;
             }
 
             # ===========================================
             # AUTENTICACIÓN -> Keycloak
             # ===========================================
             location /auth/ {
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' '*';
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+                    add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type';
+                    return 204;
+                }
+                add_header 'Access-Control-Allow-Origin' '*' always;
                 proxy_pass http://keycloak_service/;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $scheme;
-
-                # Headers de trazabilidad
-                proxy_set_header X-Gateway-Request-Id $request_id;
             }
 
             # ===========================================
             # USUARIOS SERVICE
             # ===========================================
             location /api/users {
-                # TODO: Aquí iría la validación JWT
-                # auth_request /internal/validate-token;
-
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' '*';
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+                    add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type';
+                    return 204;
+                }
+                add_header 'Access-Control-Allow-Origin' '*' always;
                 proxy_pass http://usuarios_service/api/users;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-                # Headers que el gateway añadiría tras validar JWT
-                # proxy_set_header X-User-ID $user_id;
-                # proxy_set_header X-User-Roles $user_roles;
-                proxy_set_header X-Gateway-Request-Id $request_id;
             }
 
             # ===========================================
-            # PARTICIPACIÓN SERVICE (rutas específicas primero)
+            # PARTICIPACIÓN SERVICE (rutas específicas)
             # ===========================================
             location ~ ^/api/eventos/([^/]+)/(unirse|abandonar|participantes)$ {
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' '*';
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+                    add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type';
+                    return 204;
+                }
+                add_header 'Access-Control-Allow-Origin' '*' always;
                 proxy_pass http://participacion_service;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Gateway-Request-Id $request_id;
             }
 
             location /api/participacion {
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' '*';
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+                    add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type';
+                    return 204;
+                }
+                add_header 'Access-Control-Allow-Origin' '*' always;
                 proxy_pass http://participacion_service/api/participacion;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Gateway-Request-Id $request_id;
             }
 
             # ===========================================
-            # EVENTOS SERVICE (catch-all para /api/eventos)
+            # EVENTOS SERVICE
             # ===========================================
             location /api/eventos {
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' '*';
+                    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+                    add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type';
+                    return 204;
+                }
+                add_header 'Access-Control-Allow-Origin' '*' always;
                 proxy_pass http://eventos_service/api/eventos;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Gateway-Request-Id $request_id;
             }
 
             # ===========================================
             # 404 para rutas no definidas
             # ===========================================
             location / {
-                return 404 '{"error": "Not Found", "message": "Ruta no definida en el API Gateway"}';
                 add_header Content-Type application/json;
+                return 404 '{"error": "Not Found", "message": "Ruta no definida en el API Gateway"}';
             }
         }
     }
