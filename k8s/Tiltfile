@@ -1,0 +1,98 @@
+# =============================================================================
+# TILTFILE - Desarrollo local con Docker Desktop
+# =============================================================================
+# Uso: tilt up
+# Dashboard: http://localhost:10350
+# =============================================================================
+
+# Configuración para Docker Desktop
+allow_k8s_contexts('docker-desktop')
+
+# Namespace del proyecto
+namespace = 'eventos-system'
+
+# -----------------------------------------------------------------------------
+# 1. DESPLEGAR MANIFIESTOS EN ORDEN
+# -----------------------------------------------------------------------------
+
+# Namespace primero
+k8s_yaml('namespace.yaml')
+
+# Secrets y ConfigMaps
+k8s_yaml('configmaps/secrets.yaml')
+k8s_yaml('configmaps/api-gateway-config.yaml')
+
+# Bases de datos
+k8s_yaml('databases/postgres-keycloak.yaml')
+k8s_yaml('databases/postgres-usuarios.yaml')
+k8s_yaml('databases/postgres-eventos.yaml')
+k8s_yaml('databases/postgres-participacion.yaml')
+
+# Servicios de aplicación
+k8s_yaml('services/keycloak.yaml')
+k8s_yaml('services/usuarios-service.yaml')
+k8s_yaml('services/eventos-service.yaml')
+k8s_yaml('services/participacion-service.yaml')
+
+# Ingress
+k8s_yaml('ingress/ingress.yaml')
+
+# -----------------------------------------------------------------------------
+# 2. AGRUPAR RECURSOS PARA EL DASHBOARD
+# -----------------------------------------------------------------------------
+
+# Bases de datos
+k8s_resource('db-keycloak', labels=['databases'], resource_deps=[])
+k8s_resource('db-usuarios', labels=['databases'], resource_deps=[])
+k8s_resource('db-eventos', labels=['databases'], resource_deps=[])
+k8s_resource('db-participacion', labels=['databases'], resource_deps=[])
+
+# Keycloak (espera a su BD)
+k8s_resource('keycloak',
+    labels=['identity'],
+    resource_deps=['db-keycloak'],
+    port_forwards=['8080:8080']
+)
+
+# Microservicios (esperan a sus BDs)
+k8s_resource('usuarios-service',
+    labels=['services'],
+    resource_deps=['db-usuarios', 'keycloak'],
+    port_forwards=['8081:8080']
+)
+
+k8s_resource('eventos-service',
+    labels=['services'],
+    resource_deps=['db-eventos'],
+    port_forwards=['8082:8080']
+)
+
+k8s_resource('participacion-service',
+    labels=['services'],
+    resource_deps=['db-participacion', 'eventos-service'],
+    port_forwards=['8083:8080']
+)
+
+# -----------------------------------------------------------------------------
+# 3. INFORMACIÓN EN CONSOLA
+# -----------------------------------------------------------------------------
+
+print("""
+============================================================
+  EVENTOS PLATFORM - Tilt Development Environment
+============================================================
+
+  Dashboard Tilt:     http://localhost:10350
+
+  Servicios (via port-forward):
+    - Keycloak:       http://localhost:8080
+    - Usuarios:       http://localhost:8081
+    - Eventos:        http://localhost:8082
+    - Participación:  http://localhost:8083
+
+  Credenciales Keycloak:
+    - Usuario: admin
+    - Password: admin_password_dev
+
+============================================================
+""")
