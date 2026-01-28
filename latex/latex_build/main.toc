@@ -1,0 +1,34 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {1}Vision General del Sistema}{3}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Descripcion del Problema}{3}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Arquitectura de Alto Nivel}{3}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Flujo de una Peticion}{3}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}Componentes del Sistema}{4}{subsection.1.4}%
+\contentsline {subsection}{\numberline {1.5}Namespace y Aislamiento}{4}{subsection.1.5}%
+\contentsline {section}{\numberline {2}Servicios, Versiones y Alternativas}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Stack Tecnologico Principal}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Justificacion de Decisiones Tecnologicas}{4}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}Kubernetes como Plataforma}{4}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2}Tilt para Desarrollo Local}{5}{subsubsection.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.3}nginx como API Gateway}{5}{subsubsection.2.2.3}%
+\contentsline {subsubsection}{\numberline {2.2.4}Keycloak como Identity Provider}{5}{subsubsection.2.2.4}%
+\contentsline {subsection}{\numberline {2.3}Dependencias entre Componentes}{6}{subsection.2.3}%
+\contentsline {section}{\numberline {3}Scripts y Configuraciones del Sistema}{6}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Namespace}{6}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Secrets}{6}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Base de Datos PostgreSQL}{7}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Keycloak - Identity Provider}{8}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}API Gateway}{9}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Ingress}{10}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Tiltfile}{11}{subsection.3.7}%
+\contentsline {subsection}{\numberline {3.8}Cliente React}{12}{subsection.3.8}%
+\contentsline {section}{\numberline {4}Conclusiones y Posibles Mejoras}{13}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Estado Actual del Sistema}{13}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Que se Puede Esperar del Sistema}{14}{subsection.4.2}%
+\contentsline {subsubsection}{\numberline {4.2.1}Fortalezas}{14}{subsubsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.2}Limitaciones}{14}{subsubsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.3}Posibles Mejoras}{14}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}Corto Plazo (Prototipo Avanzado)}{14}{subsubsection.4.3.1}%
+\contentsline {subsubsection}{\numberline {4.3.2}Medio Plazo (Produccion)}{14}{subsubsection.4.3.2}%
+\contentsline {subsubsection}{\numberline {4.3.3}Largo Plazo (Produccion Escalable)}{15}{subsubsection.4.3.3}%
+\contentsline {subsection}{\numberline {4.4}Conclusion Final}{15}{subsection.4.4}%

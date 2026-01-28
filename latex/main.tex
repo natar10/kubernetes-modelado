@@ -1,0 +1,814 @@
+\documentclass[12pt,a4paper]{article}
+
+% Codificacion y fuentes
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+
+% Margenes y geometria
+\usepackage[margin=2.5cm]{geometry}
+
+% Colores y graficos
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+
+% Codigo y listados
+\usepackage{listings}
+\usepackage{fancyvrb}
+
+% Tablas
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+
+% Enlaces
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black
+}
+
+% Encabezados
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Plataforma de Eventos}
+\lhead{Sistemas Distribuidos - UVA}
+\rfoot{Pagina \thepage}
+
+% Colores personalizados
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.95}
+
+% Configuracion de listings para YAML
+\lstdefinestyle{yaml}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{gray!50},
+    framesep=3pt,
+    xleftmargin=15pt,
+    framexleftmargin=15pt
+}
+
+\lstdefinestyle{javascript}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{gray!50},
+    morekeywords={const,let,async,await,function,return,import,from,export,default},
+    xleftmargin=15pt,
+    framexleftmargin=15pt
+}
+
+\lstset{style=yaml}
+
+% Titulo
+\title{
+    \vspace{-1cm}
+    \textbf{Implementacion de Plataforma Distribuida}\\
+    \large Sistema de Gestion de Eventos en Kubernetes\\
+    \vspace{0.5cm}
+    \normalsize Modelado de Plataformas de Aplicaciones Distribuidas\\
+    Universidad de Valladolid - Curso 2025-2026
+}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\vspace{1cm}
+
+\begin{abstract}
+Este documento describe la implementacion de un prototipo funcional de plataforma distribuida para la gestion de eventos, desplegada sobre Kubernetes. Se detalla la arquitectura del sistema, los servicios utilizados, las configuraciones necesarias y las decisiones tecnicas tomadas durante el desarrollo. El objetivo es demostrar como los distintos componentes de una plataforma distribuida pueden integrarse y funcionar conjuntamente, resolviendo los requisitos de infraestructura que precisa un sistema de este tipo.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+%==============================================================================
+% SECCION 1: VISION GENERAL
+%==============================================================================
+\section{Vision General del Sistema}
+
+\subsection{Descripcion del Problema}
+
+El sistema implementado es una \textbf{Plataforma de Gestion de Eventos} que permite a los usuarios crear, gestionar y participar en eventos. La arquitectura esta disenada siguiendo el patron de microservicios, donde cada dominio funcional esta encapsulado en un servicio independiente con su propia base de datos.
+
+La distribucion es relevante en este sistema por varias razones:
+\begin{itemize}
+    \item \textbf{Escalabilidad horizontal}: Cada microservicio puede escalar independientemente segun la demanda.
+    \item \textbf{Aislamiento de fallos}: Un fallo en un servicio no afecta directamente a los demas.
+    \item \textbf{Despliegue independiente}: Los equipos pueden desarrollar y desplegar servicios de forma autonoma.
+    \item \textbf{Heterogeneidad tecnologica}: Cada servicio podria usar tecnologias diferentes si fuera necesario.
+\end{itemize}
+
+\subsection{Arquitectura de Alto Nivel}
+
+El sistema sigue una arquitectura de capas claramente definidas:
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=2.5cm, minimum height=0.8cm, align=center, font=\small},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+
+% Cliente
+\node[box, fill=green!20] (client) {Cliente\\(React)};
+
+% Ingress
+\node[box, fill=yellow!20, below=of client] (ingress) {Ingress\\Controller};
+
+% API Gateway
+\node[box, fill=orange!30, below=of ingress] (gateway) {API Gateway\\(nginx)};
+
+% Microservicios
+\node[box, fill=blue!20, below left=1cm and 0.5cm of gateway] (usuarios) {Usuarios\\Service};
+\node[box, fill=blue!20, below=1cm of gateway] (eventos) {Eventos\\Service};
+\node[box, fill=blue!20, below right=1cm and 0.5cm of gateway] (participacion) {Participacion\\Service};
+\node[box, fill=purple!20, right=0.3cm of participacion] (keycloak) {Keycloak\\(IdP)};
+
+% Bases de datos
+\node[box, fill=gray!20, below=0.8cm of usuarios] (db1) {PostgreSQL};
+\node[box, fill=gray!20, below=0.8cm of eventos] (db2) {PostgreSQL};
+\node[box, fill=gray!20, below=0.8cm of participacion] (db3) {PostgreSQL};
+\node[box, fill=gray!20, below=0.8cm of keycloak] (db4) {PostgreSQL};
+
+% Flechas
+\draw[arrow] (client) -- (ingress);
+\draw[arrow] (ingress) -- (gateway);
+\draw[arrow] (gateway) -- (usuarios);
+\draw[arrow] (gateway) -- (eventos);
+\draw[arrow] (gateway) -- (participacion);
+\draw[arrow] (gateway.east) to[bend left=20] (keycloak.north);
+\draw[arrow] (usuarios) -- (db1);
+\draw[arrow] (eventos) -- (db2);
+\draw[arrow] (participacion) -- (db3);
+\draw[arrow] (keycloak) -- (db4);
+
+% Etiquetas de capas
+\node[left=1.5cm of client, font=\footnotesize\itshape] {Frontend};
+\node[left=1.5cm of ingress, font=\footnotesize\itshape] {Ingress Layer};
+\node[left=1.5cm of gateway, font=\footnotesize\itshape] {Gateway Layer};
+\node[left=2.5cm of eventos, font=\footnotesize\itshape] {Application Layer};
+\node[left=2.5cm of db2, font=\footnotesize\itshape] {Data Layer};
+
+\end{tikzpicture}
+\caption{Arquitectura de capas del sistema}
+\label{fig:arquitectura}
+\end{figure}
+
+\subsection{Flujo de una Peticion}
+
+El flujo tipico de una peticion HTTP en el sistema es:
+
+\begin{enumerate}
+    \item El \textbf{Cliente React} realiza una peticion a \texttt{api.eventos.local}
+    \item El \textbf{Ingress Controller} recibe la peticion y la enruta segun el host
+    \item El \textbf{API Gateway} recibe la peticion, aplica CORS y la enruta al microservicio correspondiente
+    \item El \textbf{Microservicio} procesa la peticion, consulta su base de datos si es necesario
+    \item La respuesta recorre el camino inverso hasta el cliente
+\end{enumerate}
+
+\subsection{Componentes del Sistema}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+\textbf{Componente} & \textbf{Tipo} & \textbf{Funcion} \\
+\midrule
+Client & Frontend & Interfaz de usuario React para visualizar estado de servicios \\
+Ingress & Routing & Punto de entrada publico, enrutamiento por dominio \\
+API Gateway & BFF & Proxy inverso, CORS, routing interno a microservicios \\
+Usuarios Service & Microservicio & Gestion de perfiles de usuario \\
+Eventos Service & Microservicio & CRUD de eventos, moderacion \\
+Participacion Service & Microservicio & Inscripciones a eventos \\
+Keycloak & Identity Provider & Autenticacion OAuth2/OIDC \\
+PostgreSQL (x4) & Base de datos & Persistencia de datos por servicio \\
+\bottomrule
+\end{tabular}
+\caption{Componentes del sistema y sus funciones}
+\end{table}
+
+\subsection{Namespace y Aislamiento}
+
+Todos los recursos se despliegan en el namespace \texttt{eventos-system}, lo que proporciona:
+\begin{itemize}
+    \item Aislamiento logico de otros workloads del cluster
+    \item Posibilidad de aplicar ResourceQuotas y LimitRanges
+    \item Control de acceso mediante RBAC a nivel de namespace
+    \item Facilidad para limpiar el entorno eliminando el namespace
+\end{itemize}
+
+%==============================================================================
+% SECCION 2: SERVICIOS Y TECNOLOGIAS
+%==============================================================================
+\section{Servicios, Versiones y Alternativas}
+
+\subsection{Stack Tecnologico Principal}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{@{}llXl@{}}
+\toprule
+\textbf{Tecnologia} & \textbf{Version} & \textbf{Proposito} & \textbf{Alternativas} \\
+\midrule
+Kubernetes & 1.28+ & Orquestacion de contenedores & Docker Swarm, Nomad \\
+Docker Desktop & 4.x & Cluster local de desarrollo & Minikube, Kind, K3s \\
+Tilt & 0.33+ & Desarrollo local con hot-reload & Skaffold, DevSpace \\
+nginx & 1.25-alpine & API Gateway y servicios mock & Traefik, Kong, Envoy \\
+PostgreSQL & 15-alpine & Base de datos relacional & MySQL, MariaDB \\
+Keycloak & 23.0 & Identity Provider OAuth2/OIDC & Auth0, Okta, Dex \\
+React & 18.2 & Frontend SPA & Vue.js, Angular, Svelte \\
+Vite & 5.0 & Build tool para frontend & Webpack, Parcel \\
+\bottomrule
+\end{tabularx}
+\caption{Stack tecnologico y alternativas}
+\end{table}
+
+\subsection{Justificacion de Decisiones Tecnologicas}
+
+\subsubsection{Kubernetes como Plataforma}
+Kubernetes fue elegido como la plataforma de referencia porque:
+\begin{itemize}
+    \item Es el estandar de facto para orquestacion de contenedores
+    \item Proporciona primitivas declarativas (Deployments, Services, ConfigMaps)
+    \item Ofrece auto-healing, rolling updates y service discovery integrados
+    \item Permite escalar horizontalmente de forma sencilla
+\end{itemize}
+
+\subsubsection{Tilt para Desarrollo Local}
+Tilt simplifica significativamente el ciclo de desarrollo:
+\begin{itemize}
+    \item Detecta cambios y reconstruye/redespliega automaticamente
+    \item Proporciona un dashboard web para monitorizacion
+    \item Gestiona dependencias entre recursos
+    \item Configura port-forwards automaticos
+\end{itemize}
+
+\subsubsection{nginx como API Gateway}
+Se eligio nginx por su simplicidad para un prototipo:
+\begin{itemize}
+    \item Configuracion declarativa y bien documentada
+    \item Excelente rendimiento como proxy inverso
+    \item Imagen Docker ligera (alpine)
+    \item Facilidad para anadir CORS y headers personalizados
+\end{itemize}
+
+En produccion, se podria considerar \textbf{Kong} o \textbf{Envoy} para funcionalidades avanzadas como rate limiting, circuit breaker o validacion JWT integrada.
+
+\subsubsection{Keycloak como Identity Provider}
+Keycloak es una solucion completa de IAM:
+\begin{itemize}
+    \item Soporte nativo para OAuth2 y OpenID Connect
+    \item Consola de administracion web
+    \item Federacion con proveedores externos (Google, GitHub, LDAP)
+    \item Gestion de roles y permisos granular
+\end{itemize}
+
+\subsection{Dependencias entre Componentes}
+
+Tilt gestiona las dependencias mediante \texttt{resource\_deps}, asegurando que los componentes se inicien en el orden correcto: Bases de Datos $\rightarrow$ Keycloak $\rightarrow$ Microservicios $\rightarrow$ API Gateway $\rightarrow$ Cliente.
+
+%==============================================================================
+% SECCION 3: SCRIPTS DEL SISTEMA
+%==============================================================================
+\section{Scripts y Configuraciones del Sistema}
+
+A continuacion se presentan los scripts mas importantes del sistema, organizados por capa funcional.
+
+\subsection{Namespace}
+
+El namespace proporciona aislamiento logico para todos los recursos del sistema.
+
+\begin{lstlisting}[caption={namespace.yaml - Definicion del namespace}, label={lst:namespace}]
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eventos-system
+  labels:
+    app.kubernetes.io/name: eventos-system
+    app.kubernetes.io/part-of: eventos-platform
+    environment: development
+\end{lstlisting}
+
+\textbf{Comentario:} Se utiliza el estandar de etiquetas de Kubernetes (\texttt{app.kubernetes.io/*}) para facilitar la identificacion y filtrado de recursos. La etiqueta \texttt{environment} permite distinguir entre entornos de desarrollo y produccion.
+
+\subsection{Secrets}
+
+Los secrets almacenan credenciales de forma segura.
+
+\begin{lstlisting}[caption={secrets.yaml - Credenciales de base de datos (extracto)}, label={lst:secrets}]
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-usuarios-secret
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: database
+type: Opaque
+stringData:
+  POSTGRES_USER: "usuarios_user"
+  POSTGRES_PASSWORD: "usuarios_password_dev"
+  POSTGRES_DB: "usuarios_db"
+\end{lstlisting}
+
+\textbf{Comentario:} En produccion, se deberian usar soluciones como HashiCorp Vault o los gestores de secretos nativos de los proveedores cloud (AWS Secrets Manager, Azure Key Vault). Los valores aqui mostrados son unicamente para desarrollo.
+
+\subsection{Base de Datos PostgreSQL}
+
+Cada microservicio tiene su propia instancia de PostgreSQL, siguiendo el patron ``Database per Service''.
+
+\begin{lstlisting}[caption={postgres-usuarios.yaml - Base de datos del servicio de usuarios}, label={lst:postgres}]
+# PersistentVolumeClaim para persistencia
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-usuarios-pvc
+  namespace: eventos-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-usuarios
+  namespace: eventos-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-usuarios
+  strategy:
+    type: Recreate  # Necesario para PVC ReadWriteOnce
+  template:
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: db-usuarios-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "usuarios_user"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: db-usuarios-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-usuarios
+  namespace: eventos-system
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+  selector:
+    app: db-usuarios
+\end{lstlisting}
+
+\textbf{Comentarios:}
+\begin{itemize}
+    \item \texttt{strategy: Recreate}: Necesario porque el PVC tiene modo \texttt{ReadWriteOnce}.
+    \item \texttt{subPath: postgres}: Evita problemas con el directorio \texttt{lost+found}.
+    \item \texttt{livenessProbe}: Utiliza \texttt{pg\_isready} para verificar el estado.
+    \item \texttt{ClusterIP}: El servicio solo es accesible internamente.
+\end{itemize}
+
+\subsection{Keycloak - Identity Provider}
+
+Keycloak proporciona autenticacion OAuth2/OIDC para el sistema.
+
+\begin{lstlisting}[caption={keycloak.yaml - Configuracion de Keycloak (extracto)}, label={lst:keycloak}]
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-config
+  namespace: eventos-system
+data:
+  KC_HOSTNAME_STRICT: "false"
+  KC_HTTP_ENABLED: "true"
+  KC_PROXY: "edge"
+  KC_DB: "postgres"
+  KC_DB_URL_HOST: "db-keycloak"
+  KC_HEALTH_ENABLED: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: eventos-system
+spec:
+  replicas: 1
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ['sh', '-c',
+            'until nc -z db-keycloak 5432; do sleep 2; done']
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:23.0
+          args: ["start-dev"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: keycloak-config
+            - secretRef:
+                name: keycloak-secret
+          resources:
+            requests:
+              memory: "512Mi"
+            limits:
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 30
+\end{lstlisting}
+
+\textbf{Comentarios:}
+\begin{itemize}
+    \item \texttt{initContainers}: Espera a que PostgreSQL este disponible.
+    \item \texttt{start-dev}: Modo desarrollo sin HTTPS. En produccion usar \texttt{start}.
+    \item \texttt{KC\_PROXY: edge}: Indica que hay un proxy delante que termina TLS.
+\end{itemize}
+
+\subsection{API Gateway}
+
+El API Gateway centraliza el acceso a los microservicios y gestiona CORS.
+
+\begin{lstlisting}[caption={api-gateway.yaml - Configuracion nginx del API Gateway}, label={lst:gateway}]
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-nginx-config
+  namespace: eventos-system
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+    http {
+        upstream usuarios_service {
+            server usuarios-service:8080;
+        }
+        upstream eventos_service {
+            server eventos-service:8080;
+        }
+        upstream participacion_service {
+            server participacion-service:8080;
+        }
+
+        server {
+            listen 8080;
+
+            location /health {
+                add_header Content-Type application/json;
+                return 200 '{"status": "healthy"}';
+            }
+
+            location /api/users {
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' '*';
+                    add_header 'Access-Control-Allow-Methods'
+                               'GET, POST, PUT, DELETE, OPTIONS';
+                    add_header 'Access-Control-Allow-Headers'
+                               'Authorization, Content-Type';
+                    return 204;
+                }
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                proxy_pass http://usuarios_service/api/users;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+
+            location /api/eventos {
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                proxy_pass http://eventos_service/api/eventos;
+            }
+
+            location /api/participacion {
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                proxy_pass http://participacion_service;
+            }
+        }
+    }
+\end{lstlisting}
+
+\textbf{Comentarios:}
+\begin{itemize}
+    \item \texttt{upstream}: Define los backends para balanceo de carga.
+    \item \texttt{CORS preflight}: Las peticiones OPTIONS se responden sin pasar al backend.
+    \item En produccion, se anadira validacion JWT mediante \texttt{auth\_request}.
+\end{itemize}
+
+\subsection{Ingress}
+
+El Ingress expone los servicios al exterior mediante routing basado en host.
+
+\begin{lstlisting}[caption={ingress.yaml - Configuracion del Ingress}, label={lst:ingress}]
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: main-ingress
+  namespace: eventos-system
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.eventos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: client-ingress
+  namespace: eventos-system
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: eventos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: client
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-admin
+  namespace: eventos-system
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: keycloak.eventos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080
+\end{lstlisting}
+
+\textbf{Comentarios:}
+\begin{itemize}
+    \item Tres Ingress separados para diferentes subdominios.
+    \item Requiere configurar \texttt{/etc/hosts}: \texttt{127.0.0.1 eventos.local api.eventos.local keycloak.eventos.local}
+\end{itemize}
+
+\subsection{Tiltfile}
+
+El Tiltfile orquesta el desarrollo local con Tilt.
+
+\begin{lstlisting}[style=javascript, caption={Tiltfile - Orquestacion de desarrollo local}, label={lst:tiltfile}]
+# Configuracion para Docker Desktop
+allow_k8s_contexts('docker-desktop')
+
+# Desplegar manifiestos
+k8s_yaml('namespace.yaml')
+k8s_yaml('configmaps/secrets.yaml')
+k8s_yaml('databases/postgres-keycloak.yaml')
+k8s_yaml('databases/postgres-usuarios.yaml')
+k8s_yaml('services/keycloak.yaml')
+k8s_yaml('services/usuarios-service.yaml')
+k8s_yaml('services/api-gateway.yaml')
+k8s_yaml('services/client.yaml')
+k8s_yaml('ingress/ingress.yaml')
+
+# Build imagen del cliente
+docker_build('eventos-client', '../client',
+    dockerfile='../client/Dockerfile')
+
+# Configurar recursos con dependencias
+k8s_resource('keycloak',
+    labels=['identity'],
+    resource_deps=['db-keycloak'],
+    port_forwards=['8080:8080'],
+    links=['http://keycloak.eventos.local'])
+
+k8s_resource('api-gateway',
+    labels=['gateway'],
+    resource_deps=['usuarios-service', 'eventos-service'],
+    port_forwards=['9000:8080'],
+    links=['http://api.eventos.local'])
+
+k8s_resource('client',
+    labels=['frontend'],
+    resource_deps=['api-gateway'],
+    port_forwards=['3000:80'],
+    links=['http://eventos.local'])
+\end{lstlisting}
+
+\textbf{Comentarios:}
+\begin{itemize}
+    \item \texttt{allow\_k8s\_contexts}: Restringe a Docker Desktop por seguridad.
+    \item \texttt{docker\_build}: Construye la imagen del cliente automaticamente.
+    \item \texttt{resource\_deps}: Define el orden de inicio.
+    \item \texttt{port\_forwards}: Acceso directo sin Ingress.
+    \item \texttt{links}: URLs clickeables en el dashboard de Tilt.
+\end{itemize}
+
+\subsection{Cliente React}
+
+Aplicacion React minimalista para visualizar el estado de los servicios.
+
+\begin{lstlisting}[style=javascript, caption={App.jsx - Componente principal del cliente}, label={lst:react}]
+const API_URL = window.__API_URL__ || 'http://api.eventos.local'
+
+const services = [
+  { id: 'gateway', name: 'API Gateway', endpoint: '/' },
+  { id: 'usuarios', name: 'Usuarios', endpoint: '/api/users' },
+  { id: 'eventos', name: 'Eventos', endpoint: '/api/eventos' },
+  { id: 'participacion', name: 'Participacion',
+    endpoint: '/api/participacion' },
+]
+
+function App() {
+  const [statuses, setStatuses] = useState({})
+
+  const checkHealth = async (service) => {
+    setStatuses(prev => ({ ...prev, [service.id]: 'loading' }))
+    try {
+      const res = await fetch(`${API_URL}${service.endpoint}`)
+      await res.json()
+      setStatuses(prev => ({ ...prev, [service.id]: 'healthy' }))
+    } catch (error) {
+      setStatuses(prev => ({ ...prev, [service.id]: 'error' }))
+    }
+  }
+
+  useEffect(() => {
+    services.forEach(service => checkHealth(service))
+  }, [])
+
+  return (
+    <div className="container">
+      <h1>Eventos Platform</h1>
+      {services.map(service => (
+        <ServiceCard key={service.id} service={service}
+          status={statuses[service.id]} onTest={checkHealth} />
+      ))}
+    </div>
+  )
+}
+\end{lstlisting}
+
+\textbf{Comentario:} El cliente realiza peticiones a cada servicio a traves del API Gateway y muestra el estado de cada uno. La URL se inyecta en runtime mediante el script \texttt{docker-entrypoint.sh}.
+
+%==============================================================================
+% SECCION 4: CONCLUSIONES
+%==============================================================================
+\section{Conclusiones y Posibles Mejoras}
+
+\subsection{Estado Actual del Sistema}
+
+El prototipo implementado demuestra con exito:
+
+\begin{itemize}
+    \item \textbf{Arquitectura de microservicios}: Separacion clara de responsabilidades con servicios independientes.
+    \item \textbf{Orquestacion con Kubernetes}: Uso de primitivas estandar (Deployments, Services, ConfigMaps, Secrets, Ingress).
+    \item \textbf{Patron API Gateway}: Punto de entrada centralizado que gestiona routing y CORS.
+    \item \textbf{Identity Provider}: Keycloak configurado y listo para gestionar autenticacion.
+    \item \textbf{Persistencia de datos}: Bases de datos PostgreSQL independientes por servicio.
+    \item \textbf{Desarrollo local eficiente}: Tilt proporciona hot-reload y dashboard de monitorizacion.
+\end{itemize}
+
+\subsection{Que se Puede Esperar del Sistema}
+
+\subsubsection{Fortalezas}
+\begin{itemize}
+    \item \textbf{Reproducibilidad}: El sistema puede desplegarse de forma identica en cualquier cluster Kubernetes.
+    \item \textbf{Escalabilidad}: Cada componente puede escalar horizontalmente modificando \texttt{replicas}.
+    \item \textbf{Observabilidad basica}: Health checks en todos los servicios permiten deteccion de fallos.
+\end{itemize}
+
+\subsubsection{Limitaciones}
+\begin{itemize}
+    \item \textbf{Servicios mock}: Los microservicios no tienen logica de negocio real.
+    \item \textbf{Sin autenticacion activa}: El API Gateway no valida JWT (preparado pero no implementado).
+    \item \textbf{Sin TLS}: Todo el trafico es HTTP en desarrollo.
+    \item \textbf{Bases de datos no replicadas}: Instancias unicas sin alta disponibilidad.
+\end{itemize}
+
+\subsection{Posibles Mejoras}
+
+\subsubsection{Corto Plazo (Prototipo Avanzado)}
+\begin{enumerate}
+    \item \textbf{Implementar validacion JWT en el API Gateway}: Usar \texttt{auth\_request} de nginx para validar tokens con Keycloak.
+    \item \textbf{Anadir logica a los microservicios}: Reemplazar nginx por aplicaciones reales (Node.js, Spring Boot, Go).
+    \item \textbf{Configurar Keycloak}: Crear el realm ``eventos'', clientes OAuth2 y roles.
+\end{enumerate}
+
+\subsubsection{Medio Plazo (Produccion)}
+\begin{enumerate}
+    \item \textbf{TLS/HTTPS}: Usar cert-manager con Let's Encrypt para certificados automaticos.
+    \item \textbf{Observabilidad completa}: Prometheus + Grafana para metricas, ELK para logs, Jaeger para tracing.
+    \item \textbf{CI/CD}: Pipeline con GitHub Actions para despliegue automatizado.
+    \item \textbf{GitOps}: Usar ArgoCD o Flux para gestion declarativa del cluster.
+\end{enumerate}
+
+\subsubsection{Largo Plazo (Produccion Escalable)}
+\begin{enumerate}
+    \item \textbf{Service Mesh}: Implementar Istio o Linkerd para mTLS y traffic management.
+    \item \textbf{Bases de datos gestionadas}: Migrar a servicios cloud (RDS, Cloud SQL).
+    \item \textbf{Event-Driven Architecture}: Anadir message broker (Kafka, RabbitMQ).
+    \item \textbf{Autoscaling}: Configurar HPA basado en metricas.
+\end{enumerate}
+
+\subsection{Conclusion Final}
+
+Este prototipo cumple su objetivo de demostrar como una plataforma de microservicios puede estructurarse y desplegarse sobre Kubernetes. Aunque los servicios son mocks sin logica real, la infraestructura esta completa y lista para evolucionar hacia un sistema de produccion.
+
+La arquitectura implementada sigue principios solidos de diseno distribuido: separacion de responsabilidades, comunicacion a traves de APIs bien definidas, gestion centralizada de identidad, y orquestacion declarativa. Estas bases permiten que el sistema escale tanto en funcionalidad como en capacidad segun las necesidades futuras.
+
+\vspace{1cm}
+\hrule
+\vspace{0.5cm}
+\begin{center}
+\textit{Documento generado para la asignatura de Modelado de Plataformas de Aplicaciones Distribuidas}\\
+\textit{Universidad de Valladolid - Curso 2025-2026}
+\end{center}
+
+\end{document}
