@@ -1,6 +1,6 @@
 
 
-# REST API Actualizada por Servicio
+# REST API por Servicio
 
 ## 1. API Gateway
 ```

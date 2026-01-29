@@ -25,19 +25,22 @@ resources:
   - databases/postgres-eventos.yaml
   - databases/postgres-participacion.yaml
 
-  # 4. Servicios de aplicación
+  # 4. Mensajería
+  - services/rabbitmq.yaml
+
+  # 5. Servicios de aplicación
   - services/keycloak.yaml
   - services/usuarios-service.yaml
   - services/eventos-service.yaml
   - services/participacion-service.yaml
 
-  # 5. API Gateway
+  # 6. API Gateway
   - services/api-gateway.yaml
 
-  # 6. Cliente
+  # 7. Cliente
   - services/client.yaml
 
-  # 7. Ingress
+  # 8. Ingress
   - ingress/ingress.yaml
 
 # Labels comunes aplicados a todos los recursos

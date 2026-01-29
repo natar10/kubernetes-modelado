@@ -1,48 +1,54 @@
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        UI[Interfaz de Usuario<br/>Web/Mobile]
+    subgraph "Actores"
+        JUGADOR[Jugador]
+        ORG[Organizador de Tienda]
     end
     
-    subgraph "Keycloack Admin"
-        UI_IDP[Keycloak Admin Console]
+    subgraph "Sistema de Gestión de Eventos"
+        
+        subgraph "Capa de Presentación"
+            WEB[Interfaz Web]
+        end
+        
+        subgraph "Capa de Servicios"
+            API[API Gateway]
+            AUTH[Autenticación]
+            USUARIOS[Gestión de Usuarios]
+            EVENTOS[Gestión de Eventos]
+            PARTICIPACION[Gestión de Participación]
+        end
+        
+        subgraph "Infraestructura"
+            QUEUE[Cola de Mensajes<br/>RabbitMQ]
+        end
+        
+        subgraph "Persistencia"
+            DB[(Bases de Datos)]
+        end
     end
     
-    subgraph "Ingress Layer - Expuesto Públicamente"
-        GW[API Gateway<br/>Ingress + Load Balancer<br/>Valida JWT y Roles]
-        KC_IN[Keycloak Admin<br/>Ingress - Opcional]
+    subgraph "Servicios Externos"
+        CALENDAR[Google Calendar]
+        EMAIL[Servicio SMTP]
     end
     
-    subgraph "Identity & Authentication"
-        IDP[Keycloak<br/>ClusterIP<br/>OAuth2/OIDC]
-    end
+    JUGADOR --> WEB
+    ORG --> WEB
     
-    subgraph "Application Services - ClusterIP Interno"
-        US[Subsistema Usuarios<br/>ClusterIP<br/>Perfiles y sincronización]
-        ES[Subsistema Eventos<br/>ClusterIP<br/>Creación, moderación y administración]
-        PS[Subsistema Participación<br/>ClusterIP<br/>Inscripciones y capacidad]
-    end
+    WEB --> API
+    API --> AUTH
+    API --> USUARIOS
+    API --> EVENTOS
+    API --> PARTICIPACION
     
-    subgraph "Database Layer - ClusterIP Interno"
-        BDUS[(BD Usuarios<br/>ClusterIP)]
-        BDES[(BD Eventos<br/>ClusterIP)]
-        BDPS[(BD Participación<br/>ClusterIP)]
-    end
+    EVENTOS --> QUEUE
+    PARTICIPACION --> QUEUE
     
-    UI -->|HTTPS Requests| GW
-    UI_IDP -.->|Admin Optional| KC_IN
+    EVENTOS --> CALENDAR
+    PARTICIPACION --> EMAIL
     
-    GW -->|Valida Token y Roles| IDP
-    GW -->|Request + Headers<br/>X-User-ID, X-User-Roles| US
-    GW -->|Request + Headers| ES
-    GW -->|Request + Headers| PS
-    
-    KC_IN -.-> IDP
-    
-    US -->|Sincroniza usuarios| IDP
-    PS -->|Gestiona inscripciones| ES
-    
-    US --> BDUS
-    ES --> BDES
-    PS --> BDPS
+    USUARIOS --> DB
+    EVENTOS --> DB
+    PARTICIPACION --> DB
 ```

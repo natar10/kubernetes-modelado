@@ -31,6 +31,10 @@ data:
   # Configuración del servicio
   SERVICE_PORT: "8080"
   LOG_LEVEL: "INFO"
+  # Configuración de RabbitMQ
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_VHOST: "eventos"
 
 ---
 # ConfigMap para nginx mock (prototipo)
@@ -118,6 +122,16 @@ spec:
                 secretKeyRef:
                   name: db-participacion-secret
                   key: POSTGRES_PASSWORD
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_PASSWORD
           resources:
             requests:
               memory: "64Mi"

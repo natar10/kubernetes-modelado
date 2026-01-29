@@ -156,6 +156,82 @@ spec:
           port: 8080
 
 ---
+# Permitir que eventos-service y participacion-service accedan a RabbitMQ
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-to-rabbitmq
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eventos-service
+        - podSelector:
+            matchLabels:
+              app: participacion-service
+      ports:
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 15672
+
+---
+# Permitir egress a servicios internos del namespace (ClusterIP)
+# Necesario para que los servicios puedan conectarse a BDs, RabbitMQ, etc.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-internal-egress
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: application
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector: {}
+
+---
+# Permitir egress a APIs externas (HTTPS) para eventos-service y participacion-service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-egress
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - eventos-service
+          - participacion-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+---
 # Permitir DNS resolution
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

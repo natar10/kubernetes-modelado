@@ -28,6 +28,9 @@ k8s_yaml('databases/postgres-usuarios.yaml')
 k8s_yaml('databases/postgres-eventos.yaml')
 k8s_yaml('databases/postgres-participacion.yaml')
 
+# Mensajería
+k8s_yaml('services/rabbitmq.yaml')
+
 # Servicios de aplicación
 k8s_yaml('services/keycloak.yaml')
 k8s_yaml('services/usuarios-service.yaml')
@@ -64,6 +67,16 @@ k8s_resource('db-usuarios', labels=['databases'], resource_deps=[])
 k8s_resource('db-eventos', labels=['databases'], resource_deps=[])
 k8s_resource('db-participacion', labels=['databases'], resource_deps=[])
 
+# RabbitMQ (cola de mensajes)
+k8s_resource('rabbitmq',
+    labels=['messaging'],
+    resource_deps=[],
+    port_forwards=['15672:15672'],
+    links=[
+        'http://localhost:15672'
+    ]
+)
+
 # Keycloak (espera a su BD)
 k8s_resource('keycloak',
     labels=['identity'],
@@ -83,13 +96,13 @@ k8s_resource('usuarios-service',
 
 k8s_resource('eventos-service',
     labels=['services'],
-    resource_deps=['db-eventos'],
+    resource_deps=['db-eventos', 'rabbitmq'],
     port_forwards=['8082:8080']
 )
 
 k8s_resource('participacion-service',
     labels=['services'],
-    resource_deps=['db-participacion', 'eventos-service'],
+    resource_deps=['db-participacion', 'eventos-service', 'rabbitmq'],
     port_forwards=['8083:8080']
 )
 
@@ -133,9 +146,11 @@ print("""
     - Cliente:        http://localhost:3000
     - API Gateway:    http://localhost:9000
     - Keycloak:       http://localhost:8080
+    - RabbitMQ UI:    http://localhost:15672
 
   Arquitectura:
     Cliente (React) -> Ingress -> API Gateway -> Microservicios
+    Eventos/Participacion <-> RabbitMQ (mensajeria asincrona)
 
   Credenciales Keycloak:
     - Usuario: admin
