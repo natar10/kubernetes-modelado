@@ -1,0 +1,156 @@
+
+
+
+\section{Diagrama de paquetes}
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Images/Paquetes/paquetes.png}
+    \caption{Diagrama de paquetes}
+    \label{fig:paquetes}
+\end{figure}
+
+\section{Allocations}
+
+Para cumplir con los requisitos del sistema, hemos requerido de 6 tecnologías principales, explicados anteriormente en la sección\ref{sec:Tecnologías}:
+\begin{itemize}
+    \item NGINX
+    \item Kubernetes
+    \item Keycloak
+    \item RabbitMQ
+    \item React
+    \item  PostgreSQL
+\end{itemize}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{c||c|c|c|c|c|c}
+        Tecnologías & RQ-01 & RQ-02 & RQ-03 & RQ-04 & RQ-05 & RQ-06 \\
+        \hline
+        NGINX       &   X   &       &   X   &   X   &   X   &       \\
+        Kubernetes  &       &   X   &       &       &       &       \\
+        Keycloak    &       &   X   &       &       &       &       \\
+        RabbitMQ    &       &       &       &       &       &       \\
+        React       &       &       &       &       &       &    X  \\
+        PostgreSQL  &       &       &       &       &       &      \\
+    \end{tabular}
+    \caption{Allocations de Requisitos de Conectividad.}
+    \label{tab:allocations1}
+\end{table}
+
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{c||c|c|c||c|c}
+        Tecnologías & RQ-11 & RQ-12 & RQ-21 & RQ-23 & RQ-24  \\
+        \hline
+        NGINX       &       &       &       &       &       \\
+        Kubernetes  &       &    X  &       &       &       \\
+        Keycloak    &       &       &   X   &   X   &       \\
+        RabbitMQ    &       &       &       &       &   X   \\
+        React       &       &       &       &       &       \\
+        PostgreSQL  &   X    &   X  &       &       &       \\
+    \end{tabular}
+    \caption{Allocations de Requisitos de Almacenamiento (RQ-1x) y Seguridad y Autenticación (RQ-2x).}
+    \label{tab:allocations2}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{c||c|c|c||c|c}
+        Tecnologías & RQ-31 & RQ-32 & RQ-33 & RQ-41 & RQ-42\\
+        \hline
+        NGINX       &       &       &       &    X  &   X   \\
+        Kubernetes  &   X   &    X  &   X   &       &       \\
+        Keycloak    &       &       &   X   &       &       \\
+        RabbitMQ    &       &       &       &       &       \\
+        React       &       &       &       &       &       \\
+        PostgreSQL  &       &       &       &       &       \\
+    \end{tabular}
+    \caption{Allocations de Requisitos de Disponibilidad y Escalabilidad (RQ-3x) y de Integración (RQ-4x).}
+    \label{tab:allocations3}
+\end{table}
+
+
+\section{Diagrama de Bloques (BDD)}
+
+\subsection{Diagrama a alto nivel}
+
+Siguiendo la descripción del problema, sacamos que nuestra aplicación necesitará de tres micro-servicios principales, uno para gestionar cada tipo de entidad con la que trabajará la plataforma: \textit{UsuariosService}, \textit{ParticipationService} y \textit{EventosService}. Además de esos tres microservicios, se necesitará de un servicio de autenticación para poder identificar a los distintos tipos de usuarios. Para poder controlar que se accede correctamente a los distintos servicios, sin necesitar de utilizar más de un solo puerto, también se necesitará un API Gateway  que lo gestione. Por último, también los servicios deben poder comunicarse con servicios externos, como a correo electrónico (SMTP) como Google Calendar.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{Images/BDD/ProyectoModelado-BDD_Alto_Nivel.png}
+    \label{fig:BBD_alto_nivel}
+\end{figure}
+
+\subsection{Diagrama de bloques}
+
+A la hora de especificar el diagrama de bloques para hacerlo más completo, tenemos que centrarnos en varios servicios que se necesitan para poder cumplir con ciertos de los los requisitos planteados.
+\begin{enumerate}
+    \item Para poder cumplir con el requisito RQ-24, requerimos de un sistema de coordinación asíncrona de mensajes distribuidos en nuestra plataforma. RabbitMQ nos aporta este mecanismo a través de una cola de mensajes, con una integración sencilla y que además nos aporta fiabilidad en la lectura. Es importante resaltar que s\textbf{olo tendrán que pasar por el coordinador los mensajes provenientes de \textit{ParticipationService} y \textit{EventosService}}, que son los únicos que necesitan ordenar llamadas asíncronas (saber qué usuario se ha añadido antes a un evento, por ejemplo). Esto nos muestra una de las ventajas de la división en microservcios, ya que \textit{UsuariosService} obvia a RabbitMQ.
+    \item Para poder garantizar una posible escalabilidad horizontal, cada uno de los servicios tendrá una base de datos propia, que no se conectarán entre ellas, sino que lo harán a través del API Gateway, algo que no sería posible con un balanceador de carga ''simple''.
+    \item Como servicio de autenticación, se eligió optar por \textbf{Keycloak}, que además permite al administrador hacer un monitoreo de los contenedores del sistema, así como facilitar la orquestación del despliegue.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Images/BDD/client+ingress.png}
+    \label{fig:BBD1}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Images/BDD/microservices.png}
+    \label{fig:BBD2}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Images/BDD/backend.png}
+    \label{fig:BBD3}
+\end{figure}
+
+
+
+\section{Diagrama Interno de Bloques (IDB)}
+
+En cuanto a las conexiones de los servicios de manera individual, hemos decidido centrarnos en dos: en Keycloak y en el API Gateway.
+
+\subsection{API Gateway: NGINX}
+
+Este componente es responsable de la recepción de las peticiones de los clientes externos, el enrutamiento de solicitudes hacia los microservicios correspondientes y la delegación de los procesos de autenticación al servicio de autenticación dedicado. A nivel interno, es interesante observar que la salida con el servicio de autenticación, pese a ser por el mismo puerto que el resto de microservicios (8080), la conexión se hace en distinto punto.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Images/IBD/api_gateway.png}
+    \caption{ADB de API Gateway}
+    \label{adb_nginx}
+\end{figure}
+
+\subsection{Keycloak}
+Como se ha explicado anteriormente, Keycloak tiene dos funciones separadas: por un lado, sirve como sistema de autenticación para que el usuario interactúe correctamente con el resto del servidor. Para ello, tiene acceso a una pequeña base de datos PostgreSQL donde Keycloack, va almacenando la salud de los diferentes servicios del sistema. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Images/IBD/keycloak.png}
+    \caption{ADB de Keycloak}
+    \label{fig:adb_keycloak}
+\end{figure}
+
+
+
+\subsection{Keycloak}
+El ParticipacionService permite manejar todo lo que es las inscripciones a 
+los eventos, por lo que es necesario que mantenga su funcionamiento aunque 
+hayan picos de demanda. Para cumplir este requerimiendo se ha colocado RMQ,
+en este diagrama de IBD se presenta el flujo de información para este servicio.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Images/IBD/IBD-ParticipacionService.png}
+    \caption{IBD de ParticipacionService}
+    \label{fig:ibd-participacionService}
+\end{figure}
+
+
+
+

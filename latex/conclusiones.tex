@@ -1,0 +1,51 @@
+\section{Conclusiones y Posibles Mejoras}
+
+\subsection{Estado Actual del Sistema}
+
+El prototipo implementado demuestra con éxito:
+
+\begin{itemize}
+    \item \textbf{Arquitectura de microservicios}: Separación clara de responsabilidades con servicios independientes.
+    \item \textbf{Orquestación con Kubernetes}: Uso de primitivas estándar (Deployments, Services, ConfigMaps, Secrets, Ingress).
+    \item \textbf{Patrón API Gateway}: Punto de entrada centralizado que gestiona routing y CORS.
+    \item \textbf{Identity Provider}: Keycloak configurado y listo para gestionar autenticación.
+    \item \textbf{Persistencia de datos}: Bases de datos PostgreSQL independientes por servicio.
+    \item \textbf{Desarrollo local eficiente}: Tilt proporciona hot-reload y dashboard de monitorización.
+\end{itemize}
+
+\subsection{Qué se Puede Esperar del Sistema}
+
+\subsubsection{Fortalezas}
+\begin{itemize}
+    \item \textbf{Reproducibilidad}: El sistema puede desplegarse de forma idéntica en cualquier cluster Kubernetes.
+    \item \textbf{Escalabilidad}: Cada componente puede escalar horizontalmente modificando \texttt{replicas}.
+    \item \textbf{Observabilidad básica}: Health checks en todos los servicios permiten detección de fallos.
+\end{itemize}
+
+\subsubsection{Limitaciones}
+\begin{itemize}
+    \item \textbf{Servicios mock}: Los microservicios no tienen lógica de negocio real.
+    \item \textbf{Sin autenticación activa}: El API Gateway no valida JWT (preparado pero no implementado).
+    \item \textbf{Sin TLS}: Todo el tráfico es HTTP en desarrollo.
+    \item \textbf{Bases de datos no replicadas}: Instancias únicas sin alta disponibilidad.
+\end{itemize}
+
+\subsection{Posibles Mejoras}
+
+\begin{enumerate}
+    \item \textbf{TLS/HTTPS}: Usar cert-manager con Let's Encrypt para certificados automáticos.
+    \item \textbf{Observabilidad completa}: Prometheus + Grafana para métricas, ELK para logs, Jaeger para tracing.
+    \item \textbf{CI/CD}: Pipeline con GitHub Actions para despliegue automatizado.
+    \item \textbf{GitOps}: Usar ArgoCD o Flux para gestión declarativa del cluster.
+\end{enumerate}
+
+\subsection{Conclusión}
+
+Este prototipo cumple su objetivo de demostrar cómo una plataforma de microservicios puede 
+estructurarse y desplegarse sobre Kubernetes. Aunque los servicios son mocks sin lógica real, 
+la infraestructura está completa y lista para evolucionar hacia un sistema de producción.
+
+La arquitectura implementada sigue principios sólidos de diseño distribuido: separación 
+de responsabilidades, comunicación a través de APIs bien definidas, gestión 
+centralizada de identidad, y orquestación declarativa. Estas bases permiten que 
+el sistema escale tanto en funcionalidad como en capacidad según las necesidades futuras.

@@ -1,0 +1,43 @@
+En los últimos años, las competiciones de juegos de cartas y juegos de mesa cooperativos han experimentado un auge significativo. 
+Títulos como \textit{Magic: The Gathering}, \textit{PokémonTCG} o \textit{Yu-Gi-Oh!} cuentan con
+comunidades globales de jugadores que se reúnen regularmente para competir en torneos
+organizados.
+
+Actualmente, la organización de estas partidas se realiza a menudo a través de grupos
+en redes sociales o aplicaciones de mensajería como WhatsApp. Sin embargo, estas
+herramientas no están diseñadas para este fin y no permiten gestionar inscripciones con
+plazas limitadas, no ofrecen visibilidad sobre eventos futuros de forma estructurada.
+Surgiendo un problema logístico importante ya que no se puede escalar cuando una 
+franquicia necesita coordinar eventos en múltiples locales simultáneamente. \\
+
+\textbf{¿Porqué un sistema distribuido es necesario para solucionar el problema?}
+
+Las franquicias de tiendas de juego operan sucursales dispersas en distintas
+ciudades y países, y eventos como los \textit{Pre-Release} se celebran simultáneamente
+en todas ellas durante el mismo fin de semana, generando picos de demanda donde las
+inscripciones pueden multiplicarse por 10x respecto a una semana normal. Un sistema
+monolítico no permite escalar cada componente de forma independiente para absorber
+estos picos selectivos.
+
+Además, la plataforma dependerá de servicios externos como Google Calendar o SMTP cuya
+disponibilidad no está garantizada; si estas operaciones se ejecutaran de forma síncrona
+en un monolito, un fallo externo bloquearía la creación de eventos. La separación en
+servicios permite aislar estos fallos. A esto se suma que un mismo usuario puede tener
+roles distintos según el contexto (jugador, juez, organizador), lo que requiere un
+sistema de identidad independiente, y que la información de eventos es consumida
+simultáneamente por clientes heterogéneos (web, apps móviles, webs de tiendas, pantallas
+informativas), cada uno con patrones de acceso diferentes.
+
+\section{Ejemplos de sistemas similares}
+
+\subsection{Eventlink}
+Eventlink es una aplicación de gestión de eventos de DTU, con una arquitectura modular .NET, utilizada por \textit{Wizards of the Coast} para la gestión de torneos oficiales de \textit{Magic:The Gathering}. Sus componentes principales son el \textbf{API}, el sistema de autenticación (\textbf{Auth}), el \textbf{Data Access} y, el más interesante, el servicio \textbf{Crawler}, del que socaba (\textit{crawl}) información de tus eventos a partir de otras Apps, como Facebook o TicketMaster.
+
+Esta, combinado con una arquitectura dirigida por eventos (EDA), permiten una gran rapidez del movimiento y trabajo de los datos dentro del sistema.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Images/enelink_screenshot.png}
+    \caption{Captura de pantalla del cliente de Eventlink}
+    \label{fig:eventlink}
+\end{figure}

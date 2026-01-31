@@ -1,0 +1,636 @@
+%=================================================================
+% SECCIÓN 1
+%=================================================================
+\section{Visión General del Prototipo en Kubernetes}
+
+\subsection{Componentes del Sistema}
+
+La arquitectura está diseñada siguiendo el patrón de microservicios, donde cada dominio
+ funcional está encapsulado en un servicio independiente con su propia base de datos.
+
+La distribución es relevante en este sistema por varias razones:
+\begin{itemize}
+    \item \textbf{Escalabilidad horizontal}: Cada microservicio puede escalar independientemente según la demanda.
+    \item \textbf{Aislamiento de fallos}: Un fallo en un servicio no afecta directamente a los demás.
+    \item \textbf{Despliegue independiente}: Los equipos pueden desarrollar y desplegar servicios de forma autónoma.
+    \item \textbf{Heterogeneidad tecnológica}: Cada servicio podría usar tecnologías diferentes si fuera necesario.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+\textbf{Componente} & \textbf{Tipo} & \textbf{Función} \\
+\midrule
+Client & Frontend & Interfaz de usuario React para visualizar estado de servicios \\
+Ingress & Routing & Punto de entrada público, enrutamiento por dominio \\
+API Gateway & BFF & Proxy inverso, CORS, routing interno a microservicios \\
+Usuarios Service & Microservicio & Gestión de perfiles de usuario \\
+Eventos Service & Microservicio & CRUD de eventos, moderación \\
+Participación Service & Microservicio & Inscripciones a eventos \\
+Keycloak & Identity Provider & Autenticación OAuth2/OIDC \\
+PostgreSQL (x4) & Base de datos & Persistencia de datos por servicio \\
+\bottomrule
+\end{tabular}
+\caption{Componentes del sistema y sus funciones}
+\end{table}
+
+\subsection{Namespace y Aislamiento}
+
+Todos los recursos se despliegan en el namespace \texttt{eventos-system}, lo que proporciona:
+\begin{itemize}
+    \item Aislamiento lógico de otros workloads del cluster
+    \item Posibilidad de aplicar ResourceQuotas y LimitRanges
+    \item Control de acceso mediante RBAC a nivel de namespace
+    \item Facilidad para limpiar el entorno eliminando el namespace
+\end{itemize}
+
+
+%=================================================================
+% SECCIÓN 2: SERVICIOS Y TECNOLOGÍAS
+%=================================================================
+\section{Servicios, Versiones y Alternativas}
+
+\subsection{Stack Tecnológico Principal}\label{sec:Tecnologías}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{@{}llXl@{}}
+\toprule
+\textbf{Tecnología} & \textbf{Versión} & \textbf{Propósito} & \textbf{Alternativas} \\
+\midrule
+Kubernetes & 1.28+ & Orquestación de contenedores & Docker Swarm, Nomad \\
+Docker Desktop & 4.x & Cluster local de desarrollo & Minikube, Kind, K3s \\
+Tilt & 0.33+ & Desarrollo local con hot-reload & Skaffold, DevSpace \\
+nginx & 1.25-alpine & API Gateway y servicios mock & Traefik, Kong, Envoy \\
+PostgreSQL & 15-alpine & Base de datos relacional & MySQL, MariaDB \\
+Keycloak & 23.0 & Identity Provider OAuth2/OIDC & Auth0, Okta, Dex \\
+React & 18.2 & Frontend SPA & Vue.js, Angular, Svelte \\
+Vite & 5.0 & Build tool para frontend & Webpack, Parcel \\
+\bottomrule
+\end{tabularx}
+\caption{Stack tecnológico y alternativas}
+\end{table}
+
+\subsection{Justificación de Decisiones Tecnológicas}
+
+\subsubsection{Kubernetes como Plataforma}
+\textbf{Kubernetes} fue elegido como la plataforma de referencia porque:
+\begin{itemize}
+    \item Es el estándar de facto para orquestación de contenedores
+    \item Proporciona primitivas declarativas (Deployments, Services, ConfigMaps)
+    \item Ofrece auto-healing, rolling updates y service discovery integrados
+    \item Permite escalar horizontalmente de forma sencilla
+\end{itemize}
+
+\subsubsection{Tilt para Desarrollo Local}
+\textbf{Tilt} simplifica significativamente el ciclo de desarrollo:
+\begin{itemize}
+    \item Detecta cambios y reconstruye/redespliega automáticamente
+    \item Proporciona un dashboard web para monitorización
+    \item Gestiona dependencias entre recursos
+    \item Configura port-forwards automáticos
+\end{itemize}
+
+\subsubsection{nginx como API Gateway}
+Se eligió \textbf{nginx} por su simplicidad para un prototipo:
+\begin{itemize}
+    \item Configuración declarativa y bien documentada
+    \item Excelente rendimiento como proxy inverso
+    \item Imagen Docker ligera (alpine)
+    \item Facilidad para añadir CORS y headers personalizados
+\end{itemize}
+
+En producción, se podría considerar \textbf{Kong} o \textbf{Envoy} para funcionalidades avanzadas como rate limiting, circuit breaker o validación JWT integrada.
+
+\subsubsection{Keycloak como Identity Provider}
+Keycloak es una solución completa de IAM:
+\begin{itemize}
+    \item Soporte nativo para OAuth2 y OpenID Connect
+    \item Consola de administración web
+    \item Federación con proveedores externos (Google, GitHub, LDAP)
+    \item Gestión de roles y permisos granular
+\end{itemize}
+
+\subsection{Dependencias entre Componentes}
+
+Tilt gestiona las dependencias mediante \texttt{resource\_deps}, asegurando que los componentes se inicien en el orden correcto: Bases de Datos $\rightarrow$ Keycloak $\rightarrow$ Microservicios $\rightarrow$ API Gateway $\rightarrow$ Cliente.
+
+
+
+\section{Mapa de Puertos y Comunicación entre Servicios}
+
+Esta sección detalla los puertos utilizados por cada servicio y cómo se comunican entre sí dentro del cluster de Kubernetes.
+
+\subsubsection{Puertos Internos (ClusterIP)}
+
+Los siguientes servicios solo son accesibles dentro del cluster mediante sus nombres DNS internos:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Servicio} & \textbf{Puerto} & \textbf{DNS Interno} & \textbf{Protocolo} \\
+\midrule
+\multicolumn{4}{l}{\textit{Bases de Datos}} \\
+db-usuarios & 5432 & db-usuarios.eventos-system.svc & PostgreSQL \\
+db-eventos & 5432 & db-eventos.eventos-system.svc & PostgreSQL \\
+db-participacion & 5432 & db-participacion.eventos-system.svc & PostgreSQL \\
+db-keycloak & 5432 & db-keycloak.eventos-system.svc & PostgreSQL \\
+\midrule
+\multicolumn{4}{l}{\textit{Microservicios}} \\
+usuarios-service & 8080 & usuarios-service.eventos-system.svc & HTTP \\
+eventos-service & 8080 & eventos-service.eventos-system.svc & HTTP \\
+participacion-service & 8080 & participacion-service.eventos-system.svc & HTTP \\
+\midrule
+\multicolumn{4}{l}{\textit{Infraestructura}} \\
+keycloak & 8080 & keycloak.eventos-system.svc & HTTP \\
+api-gateway & 8080 & api-gateway.eventos-system.svc & HTTP \\
+client & 80 & client.eventos-system.svc & HTTP \\
+\bottomrule
+\end{tabular}
+\caption{Puertos internos de los servicios (ClusterIP)}
+\end{table}
+
+\subsubsection{Puntos de Acceso Externos (Ingress)}
+
+El Ingress Controller expone los siguientes endpoints al exterior:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Host} & \textbf{Puerto Externo} & \textbf{Servicio Destino} & \textbf{Descripción} \\
+\midrule
+eventos.local & 80/443 & client:80 & Frontend React \\
+api.eventos.local & 80/443 & api-gateway:8080 & API Gateway \\
+keycloak.eventos.local & 80/443 & keycloak:8080 & Consola Admin Keycloak \\
+\bottomrule
+\end{tabular}
+\caption{Endpoints externos vía Ingress}
+\end{table}
+
+\section{Flujo de una Petición}
+
+El flujo típico de una petición HTTP en el sistema es:
+
+\begin{enumerate}
+    \item El \textbf{Cliente React} realiza una petición a \texttt{api.eventos.local}
+    \item El \textbf{Ingress Controller} recibe la petición y la enruta según el host
+    \item El \textbf{API Gateway} recibe la petición, aplica CORS y la enruta al microservicio correspondiente
+    \item El \textbf{Microservicio} procesa la petición, consulta su base de datos si es necesario
+    \item La respuesta recorre el camino inverso hasta el cliente
+\end{enumerate}
+
+\subsubsection{Port-Forwards para Desarrollo (Tilt)}
+
+Durante el desarrollo local, Tilt configura los siguientes port-forwards para acceso directo:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{URL Local} & \textbf{Servicio} & \textbf{Uso} \\
+\midrule
+http://localhost:3000 & client:80 & Frontend React \\
+http://localhost:8080 & keycloak:8080 & Keycloak Admin \\
+http://localhost:8081 & usuarios-service:8080 & API Usuarios (directo) \\
+http://localhost:8082 & eventos-service:8080 & API Eventos (directo) \\
+http://localhost:8083 & participacion-service:8080 & API Participación (directo) \\
+http://localhost:9000 & api-gateway:8080 & API Gateway (directo) \\
+\bottomrule
+\end{tabular}
+\caption{Port-forwards configurados en Tilt}
+\end{table}
+
+\subsubsection{Resumen de Comunicaciones}
+
+\begin{itemize}
+    \item Todos los servicios de tipo \texttt{ClusterIP} solo son accesibles dentro del cluster.
+    \item Las bases de datos PostgreSQL usan el puerto estándar 5432.
+    \item Los microservicios exponen sus APIs en el puerto 8080 (convención del proyecto).
+    \item El cliente React sirve contenido estático en el puerto 80 (nginx).
+    \item La comunicación entre \texttt{participacion-service} y \texttt{eventos-service} es para validar que un evento existe antes de permitir inscripciones.
+\end{itemize}
+
+
+%=================================================
+% SECCIÓN 3: SCRIPTS DEL SISTEMA
+%=================================================
+\section{Scripts y Configuraciones del Sistema}
+
+A continuación se presentan los scripts más importantes del sistema, organizados por capa funcional.
+
+\subsection{Namespace}
+
+El namespace proporciona aislamiento lógico para todos los recursos del sistema.
+Link al manifiesto completo: 
+\href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/namespace.yaml}{namespace.yaml}
+
+\begin{lstlisting}[caption={namespace.yaml - Definición del namespace}, label={lst:namespace}]
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eventos-system
+  labels:
+    app.kubernetes.io/name: eventos-system
+    app.kubernetes.io/part-of: eventos-platform
+    environment: development
+\end{lstlisting}
+
+Se utiliza el estándar de etiquetas de Kubernetes (\texttt{app.kubernetes.io/*}) para 
+facilitar la identificación y filtrado de recursos. La etiqueta \texttt{environment} 
+permite distinguir entre entornos de desarrollo y producción.
+
+\subsection{Secrets}
+
+Los \textbf{secrets} almacenan credenciales de forma segura. Y no se incluyen en el control de versiones. 
+En el siguiente link se puede ver el manifesto completo: 
+\href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/configmaps/secrets.yaml}{secrets.yaml}
+
+\begin{lstlisting}[caption={secrets.yaml - Credenciales de base de datos (extracto)}, label={lst:secrets}]
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-usuarios-secret
+  namespace: eventos-system
+  labels:
+    app.kubernetes.io/component: database
+type: Opaque
+stringData:
+  POSTGRES_USER: "usuarios_user"
+  POSTGRES_PASSWORD: "usuarios_password_dev"
+  POSTGRES_DB: "usuarios_db"
+\end{lstlisting}
+
+En producción, se deberían usar soluciones como \textbf{1Password} o los gestores de 
+secretos nativos de los proveedores cloud (AWS Secrets Manager, Azure Key Vault). 
+Los valores aquí mostrados son únicamente para desarrollo.
+
+\subsection{Base de Datos PostgreSQL}
+
+Cada microservicio tiene su propia instancia de PostgreSQL, siguiendo el patrón 
+``Database per Service''.
+Link a los manifestos: 
+\href{https://github.com/natar10/kubernetes-modelado/tree/main/k8s/databases}{databases}
+
+\begin{lstlisting}[caption={postgres-usuarios.yaml - Base de datos del servicio de usuarios}, label={lst:postgres}]
+# PersistentVolumeClaim para persistencia
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-usuarios-pvc
+  namespace: eventos-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-usuarios
+  namespace: eventos-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-usuarios
+  strategy:
+    type: Recreate  # Necesario para PVC ReadWriteOnce
+  template:
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: db-usuarios-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "usuarios_user"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: db-usuarios-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-usuarios
+  namespace: eventos-system
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+  selector:
+    app: db-usuarios
+\end{lstlisting}
+
+\textbf{Comentarios:}
+\begin{itemize}
+    \item \texttt{strategy: Recreate}: Necesario porque el PVC tiene modo \texttt{ReadWriteOnce}.
+    \item \texttt{subPath: postgres}: Evita problemas con el directorio \texttt{lost+found}.
+    \item \texttt{livenessProbe}: Utiliza \texttt{pg\_isready} para verificar el estado.
+    \item \texttt{ClusterIP}: El servicio solo es accesible internamente.
+\end{itemize}
+
+\subsection{Keycloak - Identity Provider}
+
+\textbf{Keycloak} proporciona autenticación OAuth2/OIDC para el sistema.
+Link al manifesto completo: \href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/services/keycloak.yaml}{keycloak.yaml}
+Estamos utilizando la imagen \texttt{quay.io/keycloak/keycloak:23.0}, una de las ventajas de 
+utilizar kubernetes es la facilidad para cambiar de versión simplemente modificando el manifiesto y también 
+el hecho de que puedes escoger entre múltiples imágenes oficiales o no oficiales disponibles en los repositorios públicos.
+
+\begin{lstlisting}[caption={keycloak.yaml - Configuración de Keycloak (extracto)}, label={lst:keycloak}]
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-config
+  namespace: eventos-system
+data:
+  KC_HOSTNAME_STRICT: "false"
+  KC_HTTP_ENABLED: "true"
+  KC_PROXY: "edge"
+  KC_DB: "postgres"
+  KC_DB_URL_HOST: "db-keycloak"
+  KC_HEALTH_ENABLED: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: eventos-system
+spec:
+  replicas: 1
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ['sh', '-c',
+            'until nc -z db-keycloak 5432; do sleep 2; done']
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:23.0
+          args: ["start-dev"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: keycloak-config
+            - secretRef:
+                name: keycloak-secret
+          resources:
+            requests:
+              memory: "512Mi"
+            limits:
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 30
+\end{lstlisting}
+
+\textbf{Características sobre este manifesto:}
+\begin{itemize}
+    \item \texttt{initContainers}: Espera a que PostgreSQL esté disponible, ya que Keycloak depende de la base de datos.
+    \item \texttt{start-dev}: Modo desarrollo sin HTTPS. En producción usar \texttt{start}.
+    \item \texttt{KC\_PROXY: edge}: Indica que hay un proxy delante que termina TLS.
+\end{itemize}
+
+\subsection{API Gateway}
+
+El \textbf{API Gateway} centraliza el acceso a los microservicios y gestiona CORS.
+Escogimos esta arquitectura por que el API Gateway actúa como un punto único de entrada para 
+todas las peticiones de los clientes hacia los microservicios.
+
+Es un patrón común llamado \textbf{Backend for Frontend} (BFF), que simplifica la 
+comunicación y mejora la seguridad.
+Link al manifiesto completo: 
+\href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/services/api-gateway.yaml}{api-gateway.yaml}
+
+
+\begin{lstlisting}[caption={api-gateway.yaml - Configuración nginx del API Gateway}, label={lst:gateway}]
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-nginx-config
+  namespace: eventos-system
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+    http {
+        upstream usuarios_service {
+            server usuarios-service:8080;
+        }
+        upstream eventos_service {
+            server eventos-service:8080;
+        }
+        upstream participacion_service {
+            server participacion-service:8080;
+        }
+
+        server {
+            listen 8080;
+
+            location /health {
+                add_header Content-Type application/json;
+                return 200 '{"status": "healthy"}';
+            }
+
+            location /api/users {
+                if ($request_method = 'OPTIONS') {
+                    add_header 'Access-Control-Allow-Origin' '*';
+                    add_header 'Access-Control-Allow-Methods'
+                               'GET, POST, PUT, DELETE, OPTIONS';
+                    add_header 'Access-Control-Allow-Headers'
+                               'Authorization, Content-Type';
+                    return 204;
+                }
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                proxy_pass http://usuarios_service/api/users;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+
+            location /api/eventos {
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                proxy_pass http://eventos_service/api/eventos;
+            }
+
+            location /api/participacion {
+                add_header 'Access-Control-Allow-Origin' '*' always;
+                proxy_pass http://participacion_service;
+            }
+        }
+    }
+\end{lstlisting}
+
+\textbf{Características del manifesto:}
+\begin{itemize}
+    \item \texttt{upstream}: Define los backends para balanceo de carga.
+    \item \texttt{CORS preflight}: Las peticiones OPTIONS se responden sin pasar al backend.
+    \item En producción, se añadirá validación JWT mediante \texttt{auth\_request}.
+\end{itemize}
+
+\subsection{Ingress}
+
+El \textbf{Ingress} expone los servicios al exterior mediante routing basado en host.
+Link al manifesto completo: 
+\href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/ingress/ingress.yaml}{ingress.yaml}
+
+\begin{lstlisting}[caption={ingress.yaml - Configuración del Ingress}, label={lst:ingress}]
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: main-ingress
+  namespace: eventos-system
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.eventos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: client-ingress
+  namespace: eventos-system
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: eventos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: client
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-admin
+  namespace: eventos-system
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: keycloak.eventos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080
+\end{lstlisting}
+
+\textbf{Características del manifesto:}
+\begin{itemize}
+    \item Tres Ingress separados para diferentes subdominios.
+    \item Estamos exponiendo solo los servicios que estarán accesibles públicamente.
+    \item Requiere configurar \texttt{/etc/hosts}: \texttt{127.0.0.1 eventos.local api.eventos.local keycloak.eventos.local}
+\end{itemize}
+
+\subsection{Tiltfile}
+
+El \textbf{Tiltfile} orquesta el desarrollo local con Tilt.
+Link al Tiltfile completo: 
+\href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/Tiltfile}{Tiltfile}
+
+\begin{lstlisting}[style=javascript, caption={Tiltfile - Orquestación de desarrollo local}, label={lst:tiltfile}]
+# Configuración para Docker Desktop
+allow_k8s_contexts('docker-desktop')
+
+# Desplegar manifiestos
+k8s_yaml('namespace.yaml')
+k8s_yaml('configmaps/secrets.yaml')
+k8s_yaml('databases/postgres-keycloak.yaml')
+k8s_yaml('databases/postgres-usuarios.yaml')
+k8s_yaml('services/keycloak.yaml')
+k8s_yaml('services/usuarios-service.yaml')
+k8s_yaml('services/api-gateway.yaml')
+k8s_yaml('services/client.yaml')
+k8s_yaml('ingress/ingress.yaml')
+
+# Construir imagen del cliente
+docker_build('eventos-client', '../client',
+    dockerfile='../client/Dockerfile')
+
+# Configurar recursos con dependencias
+k8s_resource('keycloak',
+    labels=['identity'],
+    resource_deps=['db-keycloak'],
+    port_forwards=['8080:8080'],
+    links=['http://keycloak.eventos.local'])
+
+k8s_resource('api-gateway',
+    labels=['gateway'],
+    resource_deps=['usuarios-service', 'eventos-service'],
+    port_forwards=['9000:8080'],
+    links=['http://api.eventos.local'])
+
+k8s_resource('client',
+    labels=['frontend'],
+    resource_deps=['api-gateway'],
+    port_forwards=['3000:80'],
+    links=['http://eventos.local'])
+\end{lstlisting}
+
+\textbf{Comentarios:}
+\begin{itemize}
+    \item \texttt{allow\_k8s\_contexts}: Restringe a Docker Desktop por seguridad.
+    \item \texttt{docker\_build}: Construye la imagen del cliente automáticamente.
+    \item \texttt{resource\_deps}: Define el orden de inicio.
+    \item \texttt{port\_forwards}: Acceso directo sin Ingress.
+    \item \texttt{links}: URLs clickeables en el dashboard de Tilt.
+\end{itemize}
+
+\subsection{Cliente React}
+
+Aplicación React Dockerizada para visualizar el estado de los servicios.
+Fue desarrollada únicamente con fines demostrativos, para verificar que los 
+servicios están operativos y accesibles a través del API Gateway.
+
+El cliente realiza peticiones a cada servicio a través del API Gateway y muestra el 
+estado de cada uno. 
+La URL se inyecta en runtime mediante el script \texttt{docker-entrypoint.sh}.
+
+Link al código fuente completo: 
+\href{https://github.com/natar10/kubernetes-modelado/tree/main/client}{cliente}
+

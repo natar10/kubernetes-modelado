@@ -1,0 +1,51 @@
+\subsection{Conectividad, Ancho de Banda y Fiabilidad}
+\begin{itemize}
+    \item \textbf{RQ-01 Ancho de Banda variable }. El sistema requiere un ancho de banda variable, con picos pronunciados durante
+    fines de semana de \textit{Pre-Release} o lanzamiento de nuevos sets, donde la carga
+    puede multiplicarse por 10x respecto a una semana normal.
+    \item \textbf{RQ-02 Tolenacia a fallos parciales. }El sistema debe tolerar fallos parciales: si un servicio externo (Google Calendar, SMTP) o un microservicio interno no está disponible, las operaciones principales deben seguir funcionando de forma degradada.
+    \item \textbf{RQ-03 Comunicación API REST}Los servicios internos se comunican mediante APIs REST sobre HTTP, utilizando el
+    DNS interno del cluster para el descubrimiento de servicios.
+    \item \textbf{RQ-04 Conexión con APIs externas} El sistema debe conectarse con APIs externas (Google Calendar, SMTP)
+    mediante llamadas HTTPS salientes, con reintentos asíncronos en caso de fallo.
+    \item \textbf{RQ-05 Punto de entrada único.} Todo el tráfico externo debe entrar por un punto de entrada único 
+    que centralice el enrutamiento y el control de acceso.
+    \item \textbf{RQ-06 Interaccción web. }El usuario final debe poder interactuar con el sistema a través de una aplicación web.
+\end{itemize}
+
+\subsection{Almacenamiento y Tipos de Datos}
+\begin{itemize}
+    \item \textbf{RQ-11 Datos textuales y relacionales}El sistema almacena datos textuales y relacionales: perfiles de jugadores, torneos,inscripciones, tiendas, resultados, tokens de sesión y configuraciones.
+    \item \textbf{RQ-12 Databases independientes.} Cada dominio funcional debe tener su propia base de datos independiente
+    (\textit{Database per Service}) para garantizar el desacoplamiento entre servicios.
+\end{itemize}
+
+\subsection{Seguridad, Autenticación y Control de Acceso}
+\begin{itemize}
+    \item \textbf{RQ-21 Autenticación centralizada.} La autenticación debe ser centralizada mediante un Identity Provider (OAuth2/OIDC),
+    permitiendo Single Sign-On para todas las aplicaciones de la plataforma.
+    \item \textbf{RQ-22 Tipos de usuario.} El sistema debe distinguir cuatro tipos de usuario con permisos diferenciados.
+    \item \textbf{RQ-23 Ocultación de claves API.} Las credenciales y claves de API deben almacenarse separadas del código fuente,
+    en un sistema de gestión de secretos.
+    %\item \textbf{RQ-24.} Los componentes internos como bases de datos no deben ser accesibles desde fueradel cluster. Solo los puntos de entrada públicos deben estar expuestos.
+    \item \textbf{RQ-24 Llamadas de escritua ordenadas.} En caso de inscripciones simultáneas a un torneo con plazas limitadas, el sistema
+    debe procesar las solicitudes en orden de llegada.
+\end{itemize}
+
+\subsection{Disponibilidad y Escalabilidad}
+\begin{itemize}
+    \item \textbf{RQ-31 Escalabilidad horizontal de componentes.} Cada componente del sistema debe poder escalarse horizontalmente de forma
+    independiente según la demanda real de cada servicio.
+    \item \textbf{RQ-32 Reinicio automático.} El sistema debe detectar automáticamente fallos en sus componentes y reiniciarlos
+    sin intervención manual.Además, el fallo en un servicio no debe propagarse a los demás: el aislamiento de fallos
+    entre componentes es un requisito fundamental.
+    \item \textbf{RQ-33 Orquestación de despegue.} El orden de arranque debe respetar las dependencias entre servicios, garantizando
+    que las bases de datos estén disponibles antes que los microservicios que las consumen.
+\end{itemize}
+
+\subsection{Integración con Sistemas Externos}
+\begin{itemize}
+    \item \textbf{RQ-41 Publicación automática en \textit{Google Calendar}. }Los torneos creados deben publicarse automáticamente en Google Calendar, permitiendo a los jugadores ver los eventos de sus tiendas en sus calendarios personales.
+    \item \textbf{RQ-42 Notificaciones automáticas a correo.} El sistema debe enviar notificaciones por correo electrónico (confirmaciones de
+    inscripción, recordatorios) a través de un servicio SMTP externo.
+\end{itemize}
