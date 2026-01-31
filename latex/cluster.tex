@@ -29,6 +29,7 @@ Usuarios Service & Microservicio & Gestión de perfiles de usuario \\
 Eventos Service & Microservicio & CRUD de eventos, moderación \\
 Participación Service & Microservicio & Inscripciones a eventos \\
 Keycloak & Identity Provider & Autenticación OAuth2/OIDC \\
+RabbitMQ & Message Broker & Cola de mensajes para coordinación asíncrona \\
 PostgreSQL (x4) & Base de datos & Persistencia de datos por servicio \\
 \bottomrule
 \end{tabular}
@@ -71,6 +72,7 @@ Tilt & 0.33+ & Desarrollo local con hot-reload & Skaffold, DevSpace \\
 nginx & 1.25-alpine & API Gateway y servicios mock & Traefik, Kong, Envoy \\
 PostgreSQL & 15-alpine & Base de datos relacional & MySQL, MariaDB \\
 Keycloak & 23.0 & Identity Provider OAuth2/OIDC & Auth0, Okta, Dex \\
+RabbitMQ & 3.12-management & Message Broker asíncrono & Apache Kafka, Redis Streams \\
 React & 18.2 & Frontend SPA & Vue.js, Angular, Svelte \\
 Vite & 5.0 & Build tool para frontend & Webpack, Parcel \\
 \bottomrule
@@ -128,9 +130,21 @@ Keycloak es una solución completa de IAM:
     \item Gestión de roles y permisos granular
 \end{itemize}
 
+\subsubsection{RabbitMQ como Message Broker}
+\textbf{RabbitMQ} fue elegido para la coordinación asíncrona de mensajes entre microservicios:
+\begin{itemize}
+    \item Implementa el protocolo AMQP, estándar para mensajería empresarial
+    \item Garantiza el orden de entrega de mensajes dentro de una cola (FIFO)
+    \item Proporciona persistencia de mensajes, evitando pérdidas ante fallos
+    \item Incluye una interfaz de administración web (Management UI) para monitorización
+    \item Imagen Docker ligera disponible (\texttt{rabbitmq:3.12-management-alpine})
+\end{itemize}
+
+Es utilizado por \texttt{eventos-service} y \texttt{participacion-service} para procesar inscripciones en orden de llegada (requisito RQ-24), desacoplando las escrituras críticas del flujo síncrono de peticiones HTTP.
+
 \subsection{Dependencias entre Componentes}
 
-Tilt gestiona las dependencias mediante \texttt{resource\_deps}, asegurando que los componentes se inicien en el orden correcto: Bases de Datos $\rightarrow$ Keycloak $\rightarrow$ Microservicios $\rightarrow$ API Gateway $\rightarrow$ Cliente.
+Tilt gestiona las dependencias mediante \texttt{resource\_deps}, asegurando que los componentes se inicien en el orden correcto: Bases de Datos $\rightarrow$ RabbitMQ / Keycloak $\rightarrow$ Microservicios $\rightarrow$ API Gateway $\rightarrow$ Cliente.
 
 
 
@@ -153,6 +167,10 @@ db-usuarios & 5432 & db-usuarios.eventos-system.svc & PostgreSQL \\
 db-eventos & 5432 & db-eventos.eventos-system.svc & PostgreSQL \\
 db-participacion & 5432 & db-participacion.eventos-system.svc & PostgreSQL \\
 db-keycloak & 5432 & db-keycloak.eventos-system.svc & PostgreSQL \\
+\midrule
+\multicolumn{4}{l}{\textit{Mensajería}} \\
+rabbitmq & 5672 & rabbitmq.eventos-system.svc & AMQP \\
+rabbitmq & 15672 & rabbitmq.eventos-system.svc & HTTP (Management) \\
 \midrule
 \multicolumn{4}{l}{\textit{Microservicios}} \\
 usuarios-service & 8080 & usuarios-service.eventos-system.svc & HTTP \\
@@ -214,6 +232,7 @@ http://localhost:8081 & usuarios-service:8080 & API Usuarios (directo) \\
 http://localhost:8082 & eventos-service:8080 & API Eventos (directo) \\
 http://localhost:8083 & participacion-service:8080 & API Participación (directo) \\
 http://localhost:9000 & api-gateway:8080 & API Gateway (directo) \\
+http://localhost:15672 & rabbitmq:15672 & RabbitMQ Management UI \\
 \bottomrule
 \end{tabular}
 \caption{Port-forwards configurados en Tilt}
@@ -227,6 +246,7 @@ http://localhost:9000 & api-gateway:8080 & API Gateway (directo) \\
     \item Los microservicios exponen sus APIs en el puerto 8080 (convención del proyecto).
     \item El cliente React sirve contenido estático en el puerto 80 (nginx).
     \item La comunicación entre \texttt{participacion-service} y \texttt{eventos-service} es para validar que un evento existe antes de permitir inscripciones.
+    \item \texttt{eventos-service} y \texttt{participacion-service} se conectan a RabbitMQ (puerto 5672) para la coordinación asíncrona de inscripciones, garantizando el orden de llegada.
 \end{itemize}
 
 
@@ -444,6 +464,83 @@ configurar las variables de entorno necesarias para que funcione correctamente.
     \item \texttt{KC\_PROXY: edge}: Indica que hay un proxy delante que termina TLS.
 \end{itemize}
 
+\subsection{RabbitMQ - Message Broker}
+
+\textbf{RabbitMQ} proporciona mensajería asíncrona entre los microservicios del sistema.
+Es utilizado por \texttt{eventos-service} y \texttt{participacion-service} para procesar
+las inscripciones a eventos en orden de llegada (requisito RQ-24).
+Link al manifiesto completo:
+\href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/services/rabbitmq.yaml}{rabbitmq.yaml}
+
+\begin{lstlisting}[caption={rabbitmq.yaml - Configuración de RabbitMQ (extracto)}, label={lst:rabbitmq}]
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: eventos-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.12-management-alpine
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_DEFAULT_VHOST
+              value: "eventos"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+          livenessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - check_port_connectivity
+            initialDelaySeconds: 20
+            periodSeconds: 10
+\end{lstlisting}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Images/k8s/rabbit.png}
+    \caption{Interfaz RabbitMQ Management UI}
+    \label{fig:rmq}
+\end{figure}
+
+
 \subsection{API Gateway}
 
 El \textbf{API Gateway} centraliza el acceso a los microservicios y gestiona CORS.
@@ -608,8 +705,17 @@ k8s_yaml('namespace.yaml')
 k8s_yaml('configmaps/secrets.yaml')
 k8s_yaml('databases/postgres-keycloak.yaml')
 k8s_yaml('databases/postgres-usuarios.yaml')
+k8s_yaml('databases/postgres-eventos.yaml')
+k8s_yaml('databases/postgres-participacion.yaml')
+
+# Mensajeria
+k8s_yaml('services/rabbitmq.yaml')
+
+# Servicios
 k8s_yaml('services/keycloak.yaml')
 k8s_yaml('services/usuarios-service.yaml')
+k8s_yaml('services/eventos-service.yaml')
+k8s_yaml('services/participacion-service.yaml')
 k8s_yaml('services/api-gateway.yaml')
 k8s_yaml('services/client.yaml')
 k8s_yaml('ingress/ingress.yaml')
@@ -625,9 +731,27 @@ k8s_resource('keycloak',
     port_forwards=['8080:8080'],
     links=['http://keycloak.eventos.local'])
 
+# RabbitMQ
+k8s_resource('rabbitmq',
+    labels=['messaging'],
+    port_forwards=['15672:15672'],
+    links=['http://localhost:15672'])
+
+k8s_resource('eventos-service',
+    labels=['services'],
+    resource_deps=['db-eventos', 'rabbitmq'],
+    port_forwards=['8082:8080'])
+
+k8s_resource('participacion-service',
+    labels=['services'],
+    resource_deps=['db-participacion',
+      'eventos-service', 'rabbitmq'],
+    port_forwards=['8083:8080'])
+
 k8s_resource('api-gateway',
     labels=['gateway'],
-    resource_deps=['usuarios-service', 'eventos-service'],
+    resource_deps=['usuarios-service',
+      'eventos-service', 'participacion-service'],
     port_forwards=['9000:8080'],
     links=['http://api.eventos.local'])
 

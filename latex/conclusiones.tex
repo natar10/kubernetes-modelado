@@ -1,51 +1,51 @@
 \section{Conclusiones y Posibles Mejoras}
 
-\subsection{Estado Actual del Sistema}
+\subsection{Sobre el modelado}
 
-El prototipo implementado demuestra con éxito:
+El objetivo principal de este trabajo ha sido modelar una plataforma de aplicaciones distribuidas
+partiendo de un problema real: la gestión de eventos y torneos para comunidades de juegos de cartas.
+Para ello, se siguió un proceso que abarcó desde la identificación de requisitos hasta la
+implementación de un prototipo funcional.
 
-\begin{itemize}
-    \item \textbf{Arquitectura de microservicios}: Separación clara de responsabilidades con servicios independientes.
-    \item \textbf{Orquestación con Kubernetes}: Uso de primitivas estándar (Deployments, Services, ConfigMaps, Secrets, Ingress).
-    \item \textbf{Patrón API Gateway}: Punto de entrada centralizado que gestiona routing y CORS.
-    \item \textbf{Identity Provider}: Keycloak configurado y listo para gestionar autenticación.
-    \item \textbf{Persistencia de datos}: Bases de datos PostgreSQL independientes por servicio.
-    \item \textbf{Desarrollo local eficiente}: Tilt proporciona hot-reload y dashboard de monitorización.
-\end{itemize}
-
-\subsection{Qué se Puede Esperar del Sistema}
+\subsection{Qué se puede esperar del sistema}
 
 \subsubsection{Fortalezas}
 \begin{itemize}
-    \item \textbf{Reproducibilidad}: El sistema puede desplegarse de forma idéntica en cualquier cluster Kubernetes.
-    \item \textbf{Escalabilidad}: Cada componente puede escalar horizontalmente modificando \texttt{replicas}.
-    \item \textbf{Observabilidad básica}: Health checks en todos los servicios permiten detección de fallos.
-\end{itemize}
-
-\subsubsection{Limitaciones}
-\begin{itemize}
-    \item \textbf{Servicios mock}: Los microservicios no tienen lógica de negocio real.
-    \item \textbf{Sin autenticación activa}: El API Gateway no valida JWT (preparado pero no implementado).
-    \item \textbf{Sin TLS}: Todo el tráfico es HTTP en desarrollo.
-    \item \textbf{Bases de datos no replicadas}: Instancias únicas sin alta disponibilidad.
+    \item \textbf{Trazabilidad}: Cada componente del prototipo responde a uno o más requisitos
+    identificados en la fase de modelado.
+    \item \textbf{Reproducibilidad}: El sistema puede desplegarse de forma idéntica en cualquier
+    cluster Kubernetes gracias a la naturaleza declarativa de los manifiestos.
+    \item \textbf{Escalabilidad}: Cada componente puede escalar horizontalmente de forma
+    independiente modificando el campo \texttt{replicas}.
+    \item \textbf{Coordinación asíncrona}: RabbitMQ permite procesar inscripciones en orden
+    de llegada sin bloquear el flujo principal de peticiones.
 \end{itemize}
 
 \subsection{Posibles Mejoras}
 
-\begin{enumerate}
+\begin{enumerate}\item \textbf{Observabilidad completa}: Prometheus + Grafana para métricas, ELK para logs,
+    Jaeger para tracing distribuido.
     \item \textbf{TLS/HTTPS}: Usar cert-manager con Let's Encrypt para certificados automáticos.
-    \item \textbf{Observabilidad completa}: Prometheus + Grafana para métricas, ELK para logs, Jaeger para tracing.
     \item \textbf{CI/CD}: Pipeline con GitHub Actions para despliegue automatizado.
     \item \textbf{GitOps}: Usar ArgoCD o Flux para gestión declarativa del cluster.
+    \item \textbf{Caché}: Se podría añadir Redis para mejorar el rendimiento de lecturas frecuentes.
+    \item \textbf{Balanceo de carga avanzado}: Configurar NGINX con reglas de enrutamiento más sofisticadas.
 \end{enumerate}
 
 \subsection{Conclusión}
 
-Este prototipo cumple su objetivo de demostrar cómo una plataforma de microservicios puede 
-estructurarse y desplegarse sobre Kubernetes. Aunque los servicios son mocks sin lógica real, 
-la infraestructura está completa y lista para evolucionar hacia un sistema de producción.
+Este trabajo demuestra cómo el proceso de modelado de una plataforma distribuida permite
+pasar de un problema concreto a una arquitectura bien definida y desplegable. A través de
+la definición de requisitos, la elaboración de diagramas SysML/UML y la asignación de
+tecnologías, se obtuvo una visión clara del sistema antes de escribir una sola línea de
+configuración.
 
-La arquitectura implementada sigue principios sólidos de diseño distribuido: separación 
-de responsabilidades, comunicación a través de APIs bien definidas, gestión 
-centralizada de identidad, y orquestación declarativa. Estas bases permiten que 
-el sistema escale tanto en funcionalidad como en capacidad según las necesidades futuras.
+La implementación del prototipo en Kubernetes validó que las decisiones tomadas durante
+el modelado son viables: la separación en microservicios, la coordinación asíncrona
+mediante RabbitMQ, la autenticación centralizada con Keycloak y la orquestación declarativa
+funcionan de forma conjunta. Aunque el prototipo utiliza servicios mock, la infraestructura
+está preparada para evolucionar hacia un sistema con lógica de negocio real.
+
+Como aprendizaje principal, este proyecto nos ha permitido comprender la importancia de
+modelar antes de implementar: los diagramas no son solo documentación, sino herramientas
+que guían las decisiones de diseño y facilitan la comunicación entre los miembros del equipo.
