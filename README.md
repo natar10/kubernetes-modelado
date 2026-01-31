@@ -5,6 +5,9 @@ cartas y de mesa. Construida con una arquitectura de microservicios sobre Kubern
 
 Proyecto academico para la asignatura de **Modelado de Sistemas Distribuidos - UVA**.
 
+El propósito de este cluster es ser un prototipo bien documentado que beneficie al modelado 
+de este sistema.
+
 ## Tecnologias
 
 | Componente | Tecnologia | Proposito |
@@ -52,6 +55,8 @@ k8s/
     └── ingress.yaml                  # Reglas de Ingress
 ```
 
+# Instalación y ejecución del cluster:
+
 ## Requisitos Previos
 
 Para ejecutar este cluster en su maquina local deberá cumplir 
@@ -68,37 +73,22 @@ con los siguientes requisitos:
 
 ### Instalacion de requisitos
 
-**Docker Desktop con Kubernetes:**
+**1. Docker Desktop con Kubernetes:**
+
+Es indispensable tener Docker Desktop, para la instalación refierase a la guía oficial según su sistema operativo:
 
 1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 2. Abrir Settings > Kubernetes > Enable Kubernetes
+
+![Enable Kubernetes](assetsDocs/EnableKubernetes.png)
+
 3. Esperar a que el cluster este listo (icono verde)
 
-**Tilt:**
+**2. Tilt:**
 
-Muy importante instalar Tilt. Aquí las instrucciones:
+Muy importante instalar Tilt. Refierase a las instrucciones según su sistema operativo aquí:
 
 [Instalación Tilt](https://docs.tilt.dev/install.html)
-
-**NGINX Ingress Controller:**
-
-Importante para el funcionamiento de ingress.
-Si se desea no instalarlo se puede acceder desde las URLs 
-proporcionadas por Tilt.
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.4/deploy/static/provider/cloud/deploy.yaml
-```
-
-### Configurar /etc/hosts
-
-Agregar la siguiente linea al archivo hosts del sistema operativo:
-
-Esto es únicamente con el efecto de poder visualizar las APIs y 
-aplicaciones desde su Ingress.
-
-- **Windows:** `C:\Windows\System32\drivers\etc\hosts`
-- **Linux/Mac:** `/etc/hosts`
 
 ```
 127.0.0.1 eventos.local api.eventos.local keycloak.eventos.local
@@ -114,7 +104,10 @@ aplicaciones desde su Ingress.
 
 ## Levantar el Cluster
 
-### Con Tilt (recomendado para desarrollo)
+Dentro de la carpeta **k8s** de este repositorio, se puede levantar el cluster con Tilt.
+Que manejará las dependencias de manera correcta para levantar los pods.
+
+### Ejecutar los siguientes comandos
 
 ```bash
 cd k8s
@@ -125,36 +118,38 @@ Esto despliega todos los recursos en orden, con hot-reload y un dashboard web.
 
 - **Dashboard Tilt:** http://localhost:10350
 
-### Con Kustomize (despliegue directo)
+![Enable Kubernetes](assetsDocs/tiltInterfaz.png)
+
+### Opcional - Con Kustomize (no se requiere si ya se levantó el cluster con Tilt)
 
 ```bash
 cd k8s
 kubectl apply -k .
 ```
 
-### Despliegue manual paso a paso
+## Acceso a los Servicios
+
+**Activar NGINX Ingress Controller:**
+
+Opcional, pero importante para el funcionamiento de ingress.
+Si se desea no instalarlo se puede acceder desde las URLs locales
+proporcionadas por Tilt.
+
+Para activarlo una vez está activo el cluster ejecutar el siguiente comando:
 
 ```bash
-# 1. Namespace
-kubectl apply -f namespace.yaml
-
-# 2. Secrets y ConfigMaps
-kubectl apply -f configmaps/
-
-# 3. Bases de datos
-kubectl apply -f databases/
-
-# 4. Esperar a que las BDs esten listas
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=database -n eventos-system --timeout=120s
-
-# 5. RabbitMQ y servicios
-kubectl apply -f services/
-
-# 6. Ingress
-kubectl apply -f ingress/
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.4/deploy/static/provider/cloud/deploy.yaml
 ```
 
-## Acceso a los Servicios
+**4. Configurar /etc/hosts**
+
+Agregar la siguiente linea al archivo hosts del sistema operativo:
+
+Esto es únicamente con el efecto de poder visualizar las APIs y 
+aplicaciones desde su Ingress.
+
+- **Windows:** `C:\Windows\System32\drivers\etc\hosts`
+- **Linux/Mac:** `/etc/hosts`
 
 ### Via Ingress (requiere /etc/hosts)
 
@@ -163,6 +158,14 @@ kubectl apply -f ingress/
 | Cliente (React) | http://eventos.local |
 | API Gateway | http://api.eventos.local |
 | Keycloak Admin | http://keycloak.eventos.local |
+
+También al dar click en el pod, por ejemplo en cliente
+
+![Pod del Cliente](assetsDocs/clientePod.png)
+
+Se va a visualizar los logs del pods, las opciones y su URL de ingress.
+
+![Ingress del Cliente](assetsDocs/clienteIngress.png)
 
 ### Via port-forward (Tilt los configura automaticamente)
 
@@ -175,6 +178,21 @@ kubectl apply -f ingress/
 | Eventos Service | http://localhost:8082 | 8082 |
 | Participacion Service | http://localhost:8083 | 8083 |
 | RabbitMQ Management | http://localhost:15672 | 15672 |
+
+
+## Servicios en funcionamiento
+
+Al levantar el clust se podrá ingresar a los diferentes servicios que forman parte de 
+la arquitectura de este sistema. Por lo que este prototipo básicamente sirve como 
+template o bootstrap de la aplicación.
+
+El cliente realiza conexiones simples a los servicios verificando su estado.
+![Cliente](assetsDocs/cliente.png)
+
+![RabbitMQ](assetsDocs/rabbit.png)
+
+![Keycloak](assetsDocs/keycloack.png)
+
 
 ## Credenciales de Desarrollo
 

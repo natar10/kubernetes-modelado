@@ -125,39 +125,3 @@ k8s_resource('client',
         'http://eventos.local'
     ]
 )
-
-# -----------------------------------------------------------------------------
-# 4. INFORMACIÓN EN CONSOLA
-# -----------------------------------------------------------------------------
-
-print("""
-============================================================
-  EVENTOS PLATFORM - Tilt Development Environment
-============================================================
-
-  Dashboard Tilt:     http://localhost:10350
-
-  Via Ingress (requiere /etc/hosts):
-    - Cliente:        http://eventos.local
-    - API Gateway:    http://api.eventos.local
-    - Keycloak:       http://keycloak.eventos.local
-
-  Via port-forward (acceso directo):
-    - Cliente:        http://localhost:3000
-    - API Gateway:    http://localhost:9000
-    - Keycloak:       http://localhost:8080
-    - RabbitMQ UI:    http://localhost:15672
-
-  Arquitectura:
-    Cliente (React) -> Ingress -> API Gateway -> Microservicios
-    Eventos/Participacion <-> RabbitMQ (mensajeria asincrona)
-
-  Credenciales Keycloak:
-    - Usuario: admin
-    - Password: admin_password_dev
-
-  /etc/hosts:
-    127.0.0.1 eventos.local api.eventos.local keycloak.eventos.local
-
-============================================================
-""")
