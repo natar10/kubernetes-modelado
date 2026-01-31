@@ -1,24 +1,28 @@
 
 
 
-\section{Diagrama de paquetes}
+A continuación se presentan los diagramas de modelado del sistema propuesto, 
+\textit{TheTable}. Todos los diagramas han sido elaborados utilizando 
+\textit{Visual Paradigm} y pretenden seguir la notación SysML/UML para representar la 
+estructura, las interacciones y la distribución de los componentes de la plataforma.
 
+\section{Diagrama de paquetes}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.7\linewidth]{Images/Paquetes/paquetes.png}
+    \includegraphics[width=0.5\linewidth]{Images/Paquetes/paquetes.png}
     \caption{Diagrama de paquetes}
     \label{fig:paquetes}
 \end{figure}
 
 \section{Allocations}
 
-Para cumplir con los requisitos del sistema, hemos requerido de 6 tecnologías principales, explicados anteriormente en la sección\ref{sec:Tecnologías}:
+Para cumplir con los requisitos del sistema, hemos requerido de 6 tecnologías principales, explicadas anteriormente en la sección \ref{sec:Tecnologías}:
 \begin{itemize}
-    \item NGINX
     \item Kubernetes
     \item Keycloak
     \item RabbitMQ
+    \item NGINX
     \item React
     \item  PostgreSQL
 \end{itemize}
@@ -77,7 +81,7 @@ Para cumplir con los requisitos del sistema, hemos requerido de 6 tecnologías p
 
 \subsection{Diagrama a alto nivel}
 
-Siguiendo la descripción del problema, sacamos que nuestra aplicación necesitará de tres micro-servicios principales, uno para gestionar cada tipo de entidad con la que trabajará la plataforma: \textit{UsuariosService}, \textit{ParticipationService} y \textit{EventosService}. Además de esos tres microservicios, se necesitará de un servicio de autenticación para poder identificar a los distintos tipos de usuarios. Para poder controlar que se accede correctamente a los distintos servicios, sin necesitar de utilizar más de un solo puerto, también se necesitará un API Gateway  que lo gestione. Por último, también los servicios deben poder comunicarse con servicios externos, como a correo electrónico (SMTP) como Google Calendar.
+Siguiendo la descripción del problema, identificamos que nuestra aplicación necesitará tres microservicios principales, uno para gestionar cada tipo de entidad con la que trabajará la plataforma: \textit{UsuariosService}, \textit{ParticipationService} y \textit{EventosService}. Además de esos tres microservicios, se necesitará un servicio de autenticación para poder identificar a los distintos tipos de usuarios. Para poder controlar que se accede correctamente a los distintos servicios, sin necesitar más de un solo puerto, también se necesitará un API Gateway que lo gestione. Por último, los servicios deben poder comunicarse con servicios externos, tanto con correo electrónico (SMTP) como con Google Calendar.
 
 \begin{figure}[H]
     \centering
@@ -87,10 +91,19 @@ Siguiendo la descripción del problema, sacamos que nuestra aplicación necesita
 
 \subsection{Diagrama de bloques}
 
-A la hora de especificar el diagrama de bloques para hacerlo más completo, tenemos que centrarnos en varios servicios que se necesitan para poder cumplir con ciertos de los los requisitos planteados.
+A la hora de especificar el diagrama de bloques para hacerlo más completo, tenemos que 
+centrarnos en varios servicios que se necesitan para poder cumplir con ciertos de 
+los requisitos planteados.
+
+\begin{tcolorbox}[colback=blue!5!white, colframe=blue!50!black, title=Nota, fonttitle=\bfseries]
+Se puede visualizar el diagrama completo siguiendo este enlace:
+\href{https://raw.githubusercontent.com/natar10/kubernetes-modelado/refs/heads/main/assetsDocs/ProyectoModelado-BDD-Final.svg}{Diagrama de bloques completo}.
+\end{tcolorbox}
+
+
 \begin{enumerate}
-    \item Para poder cumplir con el requisito RQ-24, requerimos de un sistema de coordinación asíncrona de mensajes distribuidos en nuestra plataforma. RabbitMQ nos aporta este mecanismo a través de una cola de mensajes, con una integración sencilla y que además nos aporta fiabilidad en la lectura. Es importante resaltar que s\textbf{olo tendrán que pasar por el coordinador los mensajes provenientes de \textit{ParticipationService} y \textit{EventosService}}, que son los únicos que necesitan ordenar llamadas asíncronas (saber qué usuario se ha añadido antes a un evento, por ejemplo). Esto nos muestra una de las ventajas de la división en microservcios, ya que \textit{UsuariosService} obvia a RabbitMQ.
-    \item Para poder garantizar una posible escalabilidad horizontal, cada uno de los servicios tendrá una base de datos propia, que no se conectarán entre ellas, sino que lo harán a través del API Gateway, algo que no sería posible con un balanceador de carga ''simple''.
+    \item Para poder cumplir con el requisito RQ-24, requerimos de un sistema de coordinación asíncrona de mensajes distribuidos en nuestra plataforma. RabbitMQ nos aporta este mecanismo a través de una cola de mensajes, con una integración sencilla y que además nos aporta fiabilidad en la lectura. Es importante resaltar que s\textbf{olo tendrán que pasar por el coordinador los mensajes provenientes de \textit{ParticipationService} y \textit{EventosService}}, que son los únicos que necesitan ordenar llamadas asíncronas (saber qué usuario se ha añadido antes a un evento, por ejemplo). Esto nos muestra una de las ventajas de la división en microservicios, ya que \textit{UsuariosService} obvia a RabbitMQ.
+    \item Para poder garantizar una posible escalabilidad horizontal, cada uno de los servicios tendrá una base de datos propia, que no se conectarán entre sí, sino que lo harán a través del API Gateway, algo que no sería posible con un balanceador de carga ''simple''.
     \item Como servicio de autenticación, se eligió optar por \textbf{Keycloak}, que además permite al administrador hacer un monitoreo de los contenedores del sistema, así como facilitar la orquestación del despliegue.
 \end{enumerate}
 
@@ -118,7 +131,7 @@ En cuanto a las conexiones de los servicios de manera individual, hemos decidido
 
 \subsection{API Gateway: NGINX}
 
-Este componente es responsable de la recepción de las peticiones de los clientes externos, el enrutamiento de solicitudes hacia los microservicios correspondientes y la delegación de los procesos de autenticación al servicio de autenticación dedicado. A nivel interno, es interesante observar que la salida con el servicio de autenticación, pese a ser por el mismo puerto que el resto de microservicios (8080), la conexión se hace en distinto punto.
+Este componente es responsable de la recepción de las peticiones de los clientes externos, el enrutamiento de solicitudes hacia los microservicios correspondientes y la delegación de los procesos de autenticación al servicio de autenticación dedicado. A nivel interno, es interesante observar que la comunicación con el servicio de autenticación, pese a ser por el mismo puerto que el resto de microservicios (8080), se realiza en un punto distinto.
 
 \begin{figure}[H]
     \centering
@@ -128,7 +141,7 @@ Este componente es responsable de la recepción de las peticiones de los cliente
 \end{figure}
 
 \subsection{Keycloak}
-Como se ha explicado anteriormente, Keycloak tiene dos funciones separadas: por un lado, sirve como sistema de autenticación para que el usuario interactúe correctamente con el resto del servidor. Para ello, tiene acceso a una pequeña base de datos PostgreSQL donde Keycloack, va almacenando la salud de los diferentes servicios del sistema. 
+Como se ha explicado anteriormente, Keycloak tiene dos funciones separadas: por un lado, sirve como sistema de autenticación para que el usuario interactúe correctamente con el resto del servidor. Para ello, tiene acceso a una pequeña base de datos PostgreSQL donde Keycloak va almacenando la salud de los diferentes servicios del sistema. 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\linewidth]{Images/IBD/keycloak.png}
@@ -138,10 +151,10 @@ Como se ha explicado anteriormente, Keycloak tiene dos funciones separadas: por 
 
 
 
-\subsection{Keycloak}
+\subsection{ParticipacionService}
 El ParticipacionService permite manejar todo lo que es las inscripciones a 
-los eventos, por lo que es necesario que mantenga su funcionamiento aunque 
-hayan picos de demanda. Para cumplir este requerimiendo se ha colocado RMQ,
+los eventos, por lo que es necesario que mantenga su funcionamiento aunque
+haya picos de demanda. Para cumplir este requerimiento se ha colocado RMQ,
 en este diagrama de IBD se presenta el flujo de información para este servicio.
 
 \begin{figure}[H]

@@ -35,6 +35,12 @@ PostgreSQL (x4) & Base de datos & Persistencia de datos por servicio \\
 \caption{Componentes del sistema y sus funciones}
 \end{table}
 
+\begin{tcolorbox}[colback=blue!5!white, colframe=blue!50!black, title=Nota, fonttitle=\bfseries]
+Se puede visualizar todo el código de la implementación en Kubernetes siguiendo este enlace:
+\href{https://github.com/natar10/kubernetes-modelado}{Repositorio de la implementación}.
+Incluye todas las indicaciones para levantar el cluster localmente con \textbf{Tilt}.
+\end{tcolorbox}
+
 \subsection{Namespace y Aislamiento}
 
 Todos los recursos se despliegan en el namespace \texttt{eventos-system}, lo que proporciona:
@@ -91,6 +97,16 @@ Vite & 5.0 & Build tool para frontend & Webpack, Parcel \\
     \item Gestiona dependencias entre recursos
     \item Configura port-forwards automáticos
 \end{itemize}
+
+Al levantar el cluster localmente con \textbf{tilt up}, Tilt aplica todos los manifiestos de 
+Kubernetes y levanta la interfaz web en \texttt{http://localhost:10350}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Images/k8s/tiltInterfaz.png}
+    \caption{Dashboard de Tilt}
+    \label{fig:tilt}
+\end{figure}
 
 \subsubsection{nginx como API Gateway}
 Se eligió \textbf{nginx} por su simplicidad para un prototipo:
@@ -245,7 +261,7 @@ permite distinguir entre entornos de desarrollo y producción.
 \subsection{Secrets}
 
 Los \textbf{secrets} almacenan credenciales de forma segura. Y no se incluyen en el control de versiones. 
-En el siguiente link se puede ver el manifesto completo: 
+En el siguiente link se puede ver el manifiesto completo: 
 \href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/configmaps/secrets.yaml}{secrets.yaml}
 
 \begin{lstlisting}[caption={secrets.yaml - Credenciales de base de datos (extracto)}, label={lst:secrets}]
@@ -271,7 +287,7 @@ Los valores aquí mostrados son únicamente para desarrollo.
 
 Cada microservicio tiene su propia instancia de PostgreSQL, siguiendo el patrón 
 ``Database per Service''.
-Link a los manifestos: 
+Link a los manifiestos: 
 \href{https://github.com/natar10/kubernetes-modelado/tree/main/k8s/databases}{databases}
 
 \begin{lstlisting}[caption={postgres-usuarios.yaml - Base de datos del servicio de usuarios}, label={lst:postgres}]
@@ -355,7 +371,7 @@ spec:
 \subsection{Keycloak - Identity Provider}
 
 \textbf{Keycloak} proporciona autenticación OAuth2/OIDC para el sistema.
-Link al manifesto completo: \href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/services/keycloak.yaml}{keycloak.yaml}
+Link al manifiesto completo: \href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/services/keycloak.yaml}{keycloak.yaml}
 Estamos utilizando la imagen \texttt{quay.io/keycloak/keycloak:23.0}, una de las ventajas de 
 utilizar kubernetes es la facilidad para cambiar de versión simplemente modificando el manifiesto y también 
 el hecho de que puedes escoger entre múltiples imágenes oficiales o no oficiales disponibles en los repositorios públicos.
@@ -411,7 +427,17 @@ spec:
             initialDelaySeconds: 30
 \end{lstlisting}
 
-\textbf{Características sobre este manifesto:}
+Gracias a Kubernetes, únucamente hace falta colocar la imagen de Keycloak en el manifiesto y
+configurar las variables de entorno necesarias para que funcione correctamente.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Images/k8s/keycloack.png}
+    \caption{Admin de Keycloak}
+    \label{fig:keycloak}
+\end{figure}
+
+\textbf{Características sobre este manifiesto:}
 \begin{itemize}
     \item \texttt{initContainers}: Espera a que PostgreSQL esté disponible, ya que Keycloak depende de la base de datos.
     \item \texttt{start-dev}: Modo desarrollo sin HTTPS. En producción usar \texttt{start}.
@@ -421,7 +447,7 @@ spec:
 \subsection{API Gateway}
 
 El \textbf{API Gateway} centraliza el acceso a los microservicios y gestiona CORS.
-Escogimos esta arquitectura por que el API Gateway actúa como un punto único de entrada para 
+Escogimos esta arquitectura porque el API Gateway actúa como un punto único de entrada para 
 todas las peticiones de los clientes hacia los microservicios.
 
 Es un patrón común llamado \textbf{Backend for Frontend} (BFF), que simplifica la 
@@ -486,7 +512,7 @@ data:
     }
 \end{lstlisting}
 
-\textbf{Características del manifesto:}
+\textbf{Características del manifiesto:}
 \begin{itemize}
     \item \texttt{upstream}: Define los backends para balanceo de carga.
     \item \texttt{CORS preflight}: Las peticiones OPTIONS se responden sin pasar al backend.
@@ -496,7 +522,7 @@ data:
 \subsection{Ingress}
 
 El \textbf{Ingress} expone los servicios al exterior mediante routing basado en host.
-Link al manifesto completo: 
+Link al manifiesto completo: 
 \href{https://github.com/natar10/kubernetes-modelado/blob/main/k8s/ingress/ingress.yaml}{ingress.yaml}
 
 \begin{lstlisting}[caption={ingress.yaml - Configuración del Ingress}, label={lst:ingress}]
@@ -560,7 +586,7 @@ spec:
                   number: 8080
 \end{lstlisting}
 
-\textbf{Características del manifesto:}
+\textbf{Características del manifiesto:}
 \begin{itemize}
     \item Tres Ingress separados para diferentes subdominios.
     \item Estamos exponiendo solo los servicios que estarán accesibles públicamente.
@@ -633,4 +659,11 @@ La URL se inyecta en runtime mediante el script \texttt{docker-entrypoint.sh}.
 
 Link al código fuente completo: 
 \href{https://github.com/natar10/kubernetes-modelado/tree/main/client}{cliente}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Images/k8s/cliente.png}
+    \caption{Interfaz del cliente React mostrando el estado de los servicios}
+    \label{fig:client-status}
+\end{figure}
 

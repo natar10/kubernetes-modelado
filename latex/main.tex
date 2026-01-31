@@ -5,7 +5,7 @@
 \usepackage[spanish]{babel}
 
 % Márgenes y geometría
-\usepackage[margin=2.5cm]{geometry}
+\usepackage[left=2.5cm, right=2.5cm, top=2cm, bottom=1.5cm]{geometry}
 
 \usepackage{float}
 
@@ -24,6 +24,9 @@
 \usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{float}
+
+% Cajas destacadas
+\usepackage{tcolorbox}
 
 % Enlaces
 \usepackage{hyperref}
@@ -100,10 +103,21 @@
 \lstset{style=yaml}
 
 \selectlanguage{spanish}
-\title{Proyecto Modelado}
-\author{Jorge Martín Villafruela,\\
-Nataly Rocha}
-\date{Curso 2025-2026}
+
+
+
+\title{
+    \includegraphics[width=0.7\textwidth]{./Images/UVA-Logo.jpg}\\[1cm]
+    Práctica de Laboratorio \\[0.2cm]
+    Modelado de Plataformas de Aplicaciones Distribuidas\\[2.5cm]
+}
+
+\author{
+    Martin Villafruela, Jorge \\
+    Rocha Gallo, Nataly
+}
+
+\date{\today}
 
 \begin{document}
 
@@ -124,19 +138,16 @@ Nataly Rocha}
  
 \section{Descripción de requisitos}
 
-
 \input{requisitos}
 
-\section{Boceto de arquitectura}
+\chapter{Modelado de la plataforma}
+\input{diagramas}
 
+\chapter{Implementación de la plataforma}
 \input{cluster}
 
+\chapter{Conclusiones y Trabajo futuro}
 \input{conclusiones}
-
-
-\chapter{Modelado de la plataforma}
-
-\input{diagramas}
 
  \newpage
 \section*{Referencias}
