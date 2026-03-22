@@ -57,20 +57,6 @@ spec:
         app.kubernetes.io/component: identity
         app.kubernetes.io/name: keycloak
     spec:
-      # Esperar a que la base de datos esté lista
-      initContainers:
-        - name: wait-for-db
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - |
-              echo "Esperando a que PostgreSQL esté disponible..."
-              until nc -z db-keycloak 5432; do
-                echo "PostgreSQL no disponible, reintentando en 2s..."
-                sleep 2
-              done
-              echo "PostgreSQL disponible!"
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:23.0

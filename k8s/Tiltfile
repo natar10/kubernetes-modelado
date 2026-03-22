@@ -52,7 +52,7 @@ k8s_yaml('ingress/ingress.yaml')
 
 # Construir imagen del cliente React
 docker_build(
-    'eventos-client',
+    'nrochagallo/eventos-client',
     '../client',
     dockerfile='../client/Dockerfile'
 )

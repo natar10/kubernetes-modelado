@@ -232,6 +232,28 @@ spec:
           port: 80
 
 ---
+# Permitir que Keycloak haga egress a su base de datos
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-keycloak-egress-to-database
+  namespace: eventos-system
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: db-keycloak
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
 # Permitir DNS resolution
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
